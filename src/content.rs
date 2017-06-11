@@ -35,6 +35,11 @@ pub(crate) fn encode_str_optional(mut input: &str) -> Option<text::Text> {
     Some(text::Text::from_tendril(tendril))
 }
 
+pub(crate) fn encode_str_static(input: &'static str) -> text::Text {
+    encode_str_optional(input)
+        .unwrap_or_else(|| text::Text::from_static(input))
+}
+
 pub(crate) fn encode_str(input: &str) -> text::Text {
     encode_str_optional(input)
         .unwrap_or_else(|| input.into())
@@ -54,7 +59,7 @@ impl<'s> event::IntoStream for &'s str {
     type Stream = Stream;
 
     fn into_stream(self) -> Self::Stream {
-        Stream { text: Some(encode_str(self)) }
+        Stream { data: Some(self.into()) }
     }
 }
 
@@ -66,7 +71,7 @@ macro_rules! impl_octal {
                 use std::fmt::{ Write };
                 let mut tendril = tendril::StrTendril::new();
                 write!(tendril, "{:o}", self).expect("writing octal to template");
-                Stream { text: Some(text::Text::from_tendril(tendril)) }
+                Stream { data: Some(text::Data::from_tendril(tendril)) }
             }
         }
     }
@@ -86,12 +91,12 @@ impl_octal!(i64);
 
 #[derive(Debug)]
 pub struct Stream {
-    text: Option<text::Text>,
+    data: Option<text::Data>,
 }
 
 impl event::Stream for Stream {
 
     fn next_event(&mut self) -> event::StreamResult {
-        Ok(self.text.take().map(|content| event::Event::Data { content }))
+        Ok(self.data.take().map(event::data))
     }
 }

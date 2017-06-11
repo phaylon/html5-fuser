@@ -368,7 +368,7 @@ fn try_parse_data(input: input::Input) -> Option<ParseResult> {
     }
     
     Some(Ok(Parsed {
-        event: input.location().wrap(event::data(data.into())),
+        event: input.location().wrap(event::data(text::Data::from_raw(data))),
         next_mode: Mode::Data,
         rest,
     }))
@@ -505,7 +505,7 @@ fn try_parse_attribute<'i>(tag: &str, input: input::Input<'i>)
     };
 
     Ok(Some(AttributeData {
-        attribute: event::Attribute::new(name, Some(value.into())),
+        attribute: event::Attribute::new(name, Some(text::Value::from_raw(value))),
         rest,
     }))
 }

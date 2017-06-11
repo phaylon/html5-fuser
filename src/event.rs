@@ -17,7 +17,7 @@ pub enum Event {
         content: text::Text,
     },
     Data {
-        content: text::Text,
+        content: text::Data,
     },
     RawData {
         content: text::Text,
@@ -123,7 +123,7 @@ pub(crate) fn close(tag: text::Identifier) -> Event {
     Event::ClosingTag { tag }
 }
 
-pub(crate) fn data(content: text::Text) -> Event {
+pub(crate) fn data(content: text::Data) -> Event {
     Event::Data { content }
 }
 
@@ -148,8 +148,9 @@ impl fmt::Display for Event {
                 write!(fmt, "<!doctype {}>", content),
             Event::Comment { ref content, .. } =>
                 write!(fmt, "<!--{}-->", content),
-            Event::Data { ref content, .. }
-            | Event::RawData { ref content, .. } =>
+            Event::Data { ref content, .. } =>
+                fmt::Display::fmt(content, fmt),
+            Event::RawData { ref content, .. } =>
                 fmt::Display::fmt(content, fmt),
             Event::SelfClosedTag { ref tag, ref attributes, .. } =>
                 write!(fmt, "<{} />", TagDisplay { tag: tag, attributes: attributes }),
@@ -206,23 +207,16 @@ impl Attributes {
                     attributes.push(Attribute::new(
                         attribute.name.clone(),
                         Some(match attribute.value.clone() {
-                            Some(value) =>
-                                if value.len() != 0 {
-                                    text::Value::from_text(value)
-                                        .join(separator)
-                                        .join(new_value)
-                                } else {
-                                    new_value
-                                },
+                            Some(value) => value.join(separator).join(new_value),
                             None => new_value,
-                        }).map(text::Value::into_inner),
+                        }),
                     ));
                     break 'search;
                 } else {
                     attributes.push(attribute.clone());
                 }
             }
-            attributes.push(Attribute::new(name, Some(new_value.into_inner())));
+            attributes.push(Attribute::new(name, Some(new_value)));
             return Attributes::new(attributes);
         }
         for attribute in iter {
@@ -240,10 +234,7 @@ impl Attributes {
             }
         }
         if self.items.len() != attributes.len() {
-            attributes.push(Attribute {
-                name,
-                value: value.map(text::Value::into_inner),
-            });
+            attributes.push(Attribute { name, value });
         }
         Attributes::new(attributes)
     }
@@ -251,10 +242,7 @@ impl Attributes {
     pub(crate) fn add_attribute(self, name: text::Identifier, value: Option<text::Value>)
     -> Attributes {
         let mut attributes = (*self.items).clone();
-        attributes.push(Attribute {
-            name,
-            value: value.map(text::Value::into_inner),
-        });
+        attributes.push(Attribute { name, value });
         Attributes::new(attributes)
     }
 
@@ -277,10 +265,7 @@ impl Attributes {
                 attributes.push(attribute.clone());
             }
         }
-        attributes.push(Attribute {
-            name,
-            value: value.map(text::Value::into_inner),
-        });
+        attributes.push(Attribute { name, value });
         Attributes::new(attributes)
     }
 }
@@ -304,12 +289,12 @@ impl fmt::Display for Attributes {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attribute {
     name: text::Identifier,
-    value: Option<text::Text>,
+    value: Option<text::Value>,
 }
 
 impl Attribute {
 
-    pub(crate) fn new(name: text::Identifier, value: Option<text::Text>) -> Attribute {
+    pub(crate) fn new(name: text::Identifier, value: Option<text::Value>) -> Attribute {
         Attribute {
             name: name,
             value: value,
