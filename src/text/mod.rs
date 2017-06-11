@@ -1,33 +1,17 @@
 
-mod text;
+mod base;
 mod deferred;
 mod identifier;
 mod value;
 mod data;
+mod encoded;
 
-pub(crate) use self::deferred::{
-    Deferred,
-};
+use self::base::{ Text };
+use self::deferred::{ Deferred };
 
-pub(crate) use self::identifier::{
-    identifier_eq,
-};
+pub(crate) use self::identifier::{ identifier_eq };
 
-pub use self::text::{
-    Text,
-};
-
-pub use self::identifier::{
-    Identifier,
-    IdentifierError,
-    IntoIdentifier,
-};
-
-pub use self::value::{
-    Value,
-    IntoValue,
-};
-
-pub use self::data::{
-    Data,
-};
+pub use self::encoded::{ EncodedText, EncodedStr };
+pub use self::identifier::{ Identifier, IdentifierError, IntoIdentifier };
+pub use self::value::{ Value, IntoValue };
+pub use self::data::{ Data };

@@ -17,7 +17,7 @@ impl<T> Selector for rc::Rc<T> where T: Selector {
     }
 }
 
-impl<'a> Selector for &'a Selector {
+impl<'a, T> Selector for &'a T where T: Selector {
     
     fn matches(&self, tag: &text::Identifier, attributes: &event::Attributes) -> bool {
         (*self).matches(tag, attributes)

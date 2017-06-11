@@ -13,28 +13,13 @@ pub struct Text {
 
 impl Text {
 
-    pub(crate) fn join(self, other: Text) -> Text {
-        if other.len() == 0 {
-            return self;
-        }
-        let mut tendril = self.into_tendril();
-        tendril.push_slice(&other.value);
-        Text::from_tendril(tendril)
-    }
-
-    pub(crate) fn into_tendril(self) -> tendril::StrTendril {
-        self.value.into_actual()
+    pub(crate) fn into_deferred(self) -> text::Deferred<tendril::StrTendril> {
+        self.value
     }
 
     pub(crate) fn from_static(value: &'static str) -> Text {
         Text {
             value: text::Deferred::StaticStr(value),
-        }
-    }
-
-    pub(crate) fn from_tendril(value: tendril::StrTendril) -> Text {
-        Text {
-            value: text::Deferred::Actual(value),
         }
     }
 }

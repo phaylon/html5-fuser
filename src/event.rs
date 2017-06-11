@@ -11,16 +11,16 @@ use template;
 pub enum Event {
     Noop,
     Doctype {
-        content: text::Text,
+        content: text::EncodedText,
     },
     Comment {
-        content: text::Text,
+        content: text::EncodedText,
     },
     Data {
         content: text::Data,
     },
     RawData {
-        content: text::Text,
+        content: text::EncodedText,
     },
     OpeningTag {
         tag: text::Identifier,
@@ -127,15 +127,15 @@ pub(crate) fn data(content: text::Data) -> Event {
     Event::Data { content }
 }
 
-pub(crate) fn raw_data(content: text::Text) -> Event {
+pub(crate) fn raw_data(content: text::EncodedText) -> Event {
     Event::RawData { content }
 }
 
-pub(crate) fn doctype(content: text::Text) -> Event {
+pub(crate) fn doctype(content: text::EncodedText) -> Event {
     Event::Doctype { content }
 }
 
-pub(crate) fn comment(content: text::Text) -> Event {
+pub(crate) fn comment(content: text::EncodedText) -> Event {
     Event::Comment { content }
 }
 

@@ -4,12 +4,11 @@ use std::fmt;
 
 use tendril;
 
-use content;
 use text;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value {
-    text: text::Text,
+    text: text::EncodedText,
 }
 
 impl fmt::Display for Value {
@@ -19,35 +18,23 @@ impl fmt::Display for Value {
     }
 }
 
-impl From<String> for Value {
-
-    fn from(value: String) -> Value {
-        Value {
-            text: content::encode_str(&value),
-        }
-    }
-}
-
-impl<'s> From<&'s str> for Value {
-
-    fn from(value: &'s str) -> Value {
-        Value {
-            text: content::encode_str(&value),
-        }
-    }
-}
-
 impl Value {
 
     pub(crate) fn from_raw(value: &str) -> Value {
         Value {
-            text: value.into(),
+            text: text::EncodedText::from_raw(value),
         }
     }
 
-    pub fn from_static(value: &'static str) -> Value {
+    pub fn from_unencoded(value: &str) -> Value {
         Value {
-            text: content::encode_str_static(value),
+            text: text::EncodedText::from_unencoded(value),
+        }
+    }
+
+    pub fn from_unencoded_static(value: &'static str) -> Value {
+        Value {
+            text: text::EncodedText::from_unencoded_static(value),
         }
     }
 
@@ -71,16 +58,14 @@ impl IntoValue for Value {
 impl IntoValue for String {
 
     fn into_value(self) -> Value {
-        self.into()
+        Value::from_unencoded(&self)
     }
 }
 
 impl IntoValue for &'static str {
 
     fn into_value(self) -> Value {
-        Value {
-            text: content::encode_str_static(self),
-        }
+        Value::from_unencoded_static(self)
     }
 }
 
@@ -92,7 +77,7 @@ macro_rules! impl_value_octal {
                 let mut tendril = tendril::StrTendril::new();
                 write!(tendril, "{:o}", self).expect("writing octal to value");
                 Value {
-                    text: text::Text::from_tendril(tendril),
+                    text: text::EncodedText::from_encoded_tendril(tendril),
                 }
             }
         }

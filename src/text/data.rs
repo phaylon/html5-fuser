@@ -4,12 +4,11 @@ use std::fmt;
 
 use tendril;
 
-use content;
 use text;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Data {
-    text: text::Text,
+    text: text::EncodedText,
 }
 
 impl fmt::Display for Data {
@@ -19,41 +18,29 @@ impl fmt::Display for Data {
     }
 }
 
-impl From<String> for Data {
-
-    fn from(value: String) -> Data {
-        Data {
-            text: content::encode_str(&value),
-        }
-    }
-}
-
-impl<'s> From<&'s str> for Data {
-
-    fn from(value: &'s str) -> Data {
-        Data {
-            text: content::encode_str(&value),
-        }
-    }
-}
-
 impl Data {
 
-    pub(crate) fn from_tendril(value: tendril::StrTendril) -> Data {
+    pub(crate) fn from_encoded_tendril(value: tendril::StrTendril) -> Data {
         Data {
-            text: text::Text::from_tendril(value),
+            text: text::EncodedText::from_encoded_tendril(value),
         }
     }
 
     pub(crate) fn from_raw(value: &str) -> Data {
         Data {
-            text: value.into(),
+            text: text::EncodedText::from_raw(value),
         }
     }
 
-    pub fn from_static(value: &'static str) -> Data {
+    pub fn from_unencoded(value: &str) -> Data {
         Data {
-            text: content::encode_str_static(value),
+            text: text::EncodedText::from_unencoded(value),
+        }
+    }
+
+    pub fn from_unencoded_static(value: &'static str) -> Data {
+        Data {
+            text: text::EncodedText::from_unencoded_static(value),
         }
     }
 }

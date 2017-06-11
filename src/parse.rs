@@ -351,7 +351,7 @@ fn parse_raw_data<'i>(input: input::Input<'i>, searched: &str) -> ParseResult<'i
         .unwrap_or_else(|| input.take_all());
 
     Ok(Parsed {
-        event: input.location().wrap(event::raw_data(content.into())),
+        event: input.location().wrap(event::raw_data(text::EncodedText::from_raw(content))),
         next_mode: Mode::Data,
         rest,
     })
@@ -389,7 +389,7 @@ fn try_parse_comment(input: input::Input) -> Option<ParseResult> {
     };
 
     Some(Ok(Parsed {
-        event: input.location().wrap(event::comment(content.into())),
+        event: input.location().wrap(event::comment(text::EncodedText::from_raw(content))),
         next_mode: Mode::Data,
         rest,
     }))
@@ -420,7 +420,7 @@ fn try_parse_doctype(input: input::Input) -> Option<ParseResult> {
     }
 
     Some(Ok(Parsed {
-        event: input.location().wrap(event::doctype(content.into())),
+        event: input.location().wrap(event::doctype(text::EncodedText::from_raw(content))),
         next_mode: Mode::Data,
         rest,
     }))

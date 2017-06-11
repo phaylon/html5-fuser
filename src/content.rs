@@ -4,47 +4,6 @@ use tendril;
 use event;
 use text;
 
-const ENCODE_CHARS: &[char] = &['&', '<', '>', '"'];
-
-pub(crate) fn encode_char(chr: char) -> &'static str {
-    match chr {
-        '&' => "&amp;",
-        '<' => "&lt;",
-        '>' => "&gt;",
-        '"' => "&quot;",
-        c => panic!("unexpected char for encode: '{}'", c.escape_default()),
-    }
-}
-
-pub(crate) fn encode_str_optional(mut input: &str) -> Option<text::Text> {
-    let mut tendril = tendril::StrTendril::new();
-    'parts: while !input.is_empty() {
-        let len = match input.find(ENCODE_CHARS) {
-            Some(pos) => pos,
-            None => return None,
-        };
-        tendril.push_slice(&input[..len]);
-        input = &input[len..];
-        let chr = match input.chars().next() {
-            None => break 'parts,
-            Some(chr) => chr,
-        };
-        tendril.push_slice(encode_char(chr));
-        input = &input[chr.len_utf8()..];
-    }
-    Some(text::Text::from_tendril(tendril))
-}
-
-pub(crate) fn encode_str_static(input: &'static str) -> text::Text {
-    encode_str_optional(input)
-        .unwrap_or_else(|| text::Text::from_static(input))
-}
-
-pub(crate) fn encode_str(input: &str) -> text::Text {
-    encode_str_optional(input)
-        .unwrap_or_else(|| input.into())
-}
-
 impl event::IntoStream for text::Data {
 
     type Stream = Stream;
@@ -59,16 +18,16 @@ impl event::IntoStream for String {
     type Stream = Stream;
 
     fn into_stream(self) -> Self::Stream {
-        event::IntoStream::into_stream(&*self)
+        Stream { data: Some(text::Data::from_unencoded(&self)) }
     }
 }
 
-impl<'s> event::IntoStream for &'s str {
+impl event::IntoStream for &'static str {
 
     type Stream = Stream;
 
     fn into_stream(self) -> Self::Stream {
-        Stream { data: Some(self.into()) }
+        Stream { data: Some(text::Data::from_unencoded_static(self)) }
     }
 }
 
@@ -80,7 +39,7 @@ macro_rules! impl_octal {
                 use std::fmt::{ Write };
                 let mut tendril = tendril::StrTendril::new();
                 write!(tendril, "{:o}", self).expect("writing octal to template");
-                Stream { data: Some(text::Data::from_tendril(tendril)) }
+                Stream { data: Some(text::Data::from_encoded_tendril(tendril)) }
             }
         }
     }
