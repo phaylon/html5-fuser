@@ -263,6 +263,67 @@ mod tests {
     }
 
     #[test]
+    fn replace_attribute() {
+        test_transform!(
+            Default::default(),
+            "<a foo=\"bar\" baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .replace_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
+                )
+        );
+        test_transform!(
+            Default::default(),
+            "<a foo=\"bar\" baz=\"qux\" foo=\"false\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .replace_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
+                )
+        );
+        test_transform!(
+            Default::default(),
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .replace_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
+                )
+        );
+    }
+
+    #[test]
+    fn add_to_attribute() {
+        test_transform!(
+            Default::default(),
+            "<a foo=\"bar\" baz=\"qux\">23</a>",
+            "<a foo=\"bar:newval\" baz=\"qux\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .add_to_attribute(
+                        ::text::Identifier::from_str("foo").unwrap(),
+                        "newval",
+                        ":",
+                    )
+                )
+        );
+        test_transform!(
+            Default::default(),
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .add_to_attribute(
+                        ::text::Identifier::from_str("foo").unwrap(),
+                        "newval",
+                        ":",
+                    )
+                )
+        );
+    }
+
+    #[test]
     fn add_attribute() {
         test_transform!(
             Default::default(),

@@ -200,27 +200,30 @@ impl Attributes {
     ) -> Attributes {
         let mut attributes = Vec::new();
         let mut iter = self.items.iter();
-        for attribute in &mut iter {
-            if attribute.name == name {
-                attributes.push(Attribute::new(
-                    attribute.name
-                        .clone(),
-                    Some(match attribute.value.clone() {
-                        Some(value) =>
-                            if value.len() != 0 {
-                                text::Value::from_text(value)
-                                    .join(separator)
-                                    .join(new_value)
-                            } else {
-                                new_value
-                            },
-                        None => new_value,
-                    }).map(text::Value::into_inner),
-                ));
-                break;
-            } else {
-                attributes.push(attribute.clone());
+        'search: loop {
+            for attribute in &mut iter {
+                if attribute.name == name {
+                    attributes.push(Attribute::new(
+                        attribute.name.clone(),
+                        Some(match attribute.value.clone() {
+                            Some(value) =>
+                                if value.len() != 0 {
+                                    text::Value::from_text(value)
+                                        .join(separator)
+                                        .join(new_value)
+                                } else {
+                                    new_value
+                                },
+                            None => new_value,
+                        }).map(text::Value::into_inner),
+                    ));
+                    break 'search;
+                } else {
+                    attributes.push(attribute.clone());
+                }
             }
+            attributes.push(Attribute::new(name, Some(new_value.into_inner())));
+            return Attributes::new(attributes);
         }
         for attribute in iter {
             attributes.push(attribute.clone());
