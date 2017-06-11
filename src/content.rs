@@ -45,6 +45,15 @@ pub(crate) fn encode_str(input: &str) -> text::Text {
         .unwrap_or_else(|| input.into())
 }
 
+impl event::IntoStream for text::Data {
+
+    type Stream = Stream;
+
+    fn into_stream(self) -> Self::Stream {
+        Stream { data: Some(self) }
+    }
+}
+
 impl event::IntoStream for String {
 
     type Stream = Stream;
