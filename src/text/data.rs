@@ -32,15 +32,15 @@ impl Data {
         }
     }
 
-    pub fn from_unencoded(value: &str) -> Data {
+    pub fn from_unencoded_str(value: &str) -> Data {
         Data {
-            text: text::EncodedText::from_unencoded(value),
+            text: text::EncodedText::from_unencoded_str(value),
         }
     }
 
-    pub fn from_unencoded_static(value: &'static str) -> Data {
+    pub fn from_unencoded_static_str(value: &'static str) -> Data {
         Data {
-            text: text::EncodedText::from_unencoded_static(value),
+            text: text::EncodedText::from_unencoded_static_str(value),
         }
     }
 }

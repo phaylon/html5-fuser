@@ -3,6 +3,7 @@ use tendril;
 
 use event;
 use text;
+use modifier;
 
 impl event::IntoStream for text::Data {
 
@@ -18,7 +19,7 @@ impl event::IntoStream for String {
     type Stream = Stream;
 
     fn into_stream(self) -> Self::Stream {
-        Stream { data: Some(text::Data::from_unencoded(&self)) }
+        Stream { data: Some(text::Data::from_unencoded_str(&self)) }
     }
 }
 
@@ -27,7 +28,29 @@ impl event::IntoStream for &'static str {
     type Stream = Stream;
 
     fn into_stream(self) -> Self::Stream {
-        Stream { data: Some(text::Data::from_unencoded_static(self)) }
+        Stream { data: Some(text::Data::from_unencoded_static_str(self)) }
+    }
+}
+
+impl<S> event::IntoStream for S where S: event::Stream {
+
+    type Stream = S;
+
+    fn into_stream(self) -> S { self }
+}
+
+impl<S, E> event::IntoStream for Result<S, E>
+where
+    S: event::IntoStream,
+    E: Into<event::StreamError>,
+{
+    type Stream = modifier::Fallible<S::Stream>;
+
+    fn into_stream(self) -> Self::Stream {
+        modifier::Fallible::new(
+            self.map(event::IntoStream::into_stream)
+                .map_err(Into::into)
+        )
     }
 }
 

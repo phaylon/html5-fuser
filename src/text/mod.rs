@@ -15,3 +15,5 @@ pub use self::encoded::{ EncodedText, EncodedStr };
 pub use self::identifier::{ Identifier, IdentifierError, IntoIdentifier };
 pub use self::value::{ Value, IntoValue };
 pub use self::data::{ Data };
+
+pub(crate) use self::identifier::{ validate as validate_identifier };

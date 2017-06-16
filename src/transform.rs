@@ -7,6 +7,10 @@ use select;
 use template;
 use text;
 
+pub type BoxedApi<'t> = Api<'t, Box<event::Stream>>;
+
+pub type BoxedElementApi<'t> = Api<'t, Box<event::ElementStream>>;
+
 #[derive(Debug)]
 pub struct Api<'t, S> {
     stream: S,
@@ -41,33 +45,48 @@ impl<'t, S> Api<'t, S> {
     }
 }
 
+type SelectAny<M, S, F, X> = modifier::Fallible<modifier::select::SelectAny<M, S, F, X>>;
+type SelectDirect<M, S, F, X> = modifier::Fallible<modifier::select::SelectDirect<M, S, F, X>>;
+
 impl<'t, S> Api<'t, S> where S: event::Stream {
 
+    pub fn into_boxed(self) -> BoxedApi<'t> where S: 'static {
+        Api::pack(Box::new(self.stream))
+    }
+
     pub fn select<M, F, X>(self, selector: M, transform: F)
-    -> Api<'t, modifier::select::SelectAny<M::Selector, S, F, X>>
+    -> Api<'t, SelectAny<M::Selector, S, F, X>>
     where
         M: select::IntoSelector,
         F: for<'tb> FnMut(Api<'tb, modifier::select::Stream<S>>) -> Api<'tb, X>,
         X: event::Stream,
     {
-        Api::pack(modifier::select::SelectAny::new(
-            selector.into_selector(),
-            self.stream,
-            transform,
+        Api::pack(modifier::Fallible::new(
+            selector.into_selector()
+                .map(move |selector| modifier::select::SelectAny::new(
+                    selector,
+                    self.stream,
+                    transform,
+                ))
+                .map_err(Into::into)
         ))
     }
 
     pub fn select_direct<M, F, X>(self, selector: M, transform: F)
-    -> Api<'t, modifier::select::SelectDirect<M::Selector, S, F, X>>
+    -> Api<'t, SelectDirect<M::Selector, S, F, X>>
     where
         M: select::IntoSelector,
         F: for<'tb> FnMut(Api<'tb, modifier::select::Stream<S>>) -> Api<'tb, X>,
         X: event::Stream,
     {
-        Api::pack(modifier::select::SelectDirect::new(
-            selector.into_selector(),
-            self.stream,
-            transform,
+        Api::pack(modifier::Fallible::new(
+            selector.into_selector()
+                .map(move |selector| modifier::select::SelectDirect::new(
+                    selector,
+                    self.stream,
+                    transform,
+                ))
+                .map_err(Into::into)
         ))
     }
 
@@ -104,6 +123,15 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
         X: event::Stream,
     {
         Api::pack(modifier::repeat::Repeat::new(iter.into_iter(), self.stream, builder))
+    }
+
+    pub fn apply_as_boxed<B, X>(self, builder: B) -> Api<'t, X>
+    where
+        B: for<'tb> FnOnce(BoxedApi<'tb>) -> Api<'tb, X>,
+        X: event::Stream,
+        S: 'static,
+    {
+        builder(self.into_boxed())
     }
 
     pub fn apply<B, X>(self, builder: B) -> Api<'t, X>
@@ -151,35 +179,53 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
     }
 }
 
+type SubSelectAny<M, S, F, X> =
+    modifier::Fallible<modifier::select::SubSelectAny<M, S, F, X>>;
+
+type SubSelectDirect<M, S, F, X> =
+    modifier::Fallible<modifier::select::SubSelectDirect<M, S, F, X>>;
+
 type SubSelectInput<S> = modifier::select::Stream<modifier::select::ContentStream<S>>;
 
 impl<'t, S> Api<'t, S> where S: event::ElementStream {
 
+    pub fn into_boxed_element(self) -> BoxedElementApi<'t> where S: 'static {
+        Api::pack(Box::new(self.stream))
+    }
+
     pub fn subselect<M, F, X>(self, selector: M, transform: F)
-    -> Api<'t, modifier::select::SubSelectAny<M::Selector, S, F, X>>
+    -> Api<'t, SubSelectAny<M::Selector, S, F, X>>
     where
         M: select::IntoSelector,
         F: for<'tb> FnMut(Api<'tb, SubSelectInput<S>>) -> Api<'tb, X>,
         X: event::Stream,
     {
-        Api::pack(modifier::select::SubSelectAny::new(
-            selector.into_selector(),
-            self.stream,
-            transform,
+        Api::pack(modifier::Fallible::new(
+            selector.into_selector()
+                .map(move |selector| modifier::select::SubSelectAny::new(
+                    selector,
+                    self.stream,
+                    transform,
+                ))
+                .map_err(Into::into)
         ))
     }
 
     pub fn subselect_direct<M, F, X>(self, selector: M, transform: F)
-    -> Api<'t, modifier::select::SubSelectDirect<M::Selector, S, F, X>>
+    -> Api<'t, SubSelectDirect<M::Selector, S, F, X>>
     where
         M: select::IntoSelector,
         F: for<'tb> FnMut(Api<'tb, SubSelectInput<S>>) -> Api<'tb, X>,
         X: event::Stream,
     {
-        Api::pack(modifier::select::SubSelectDirect::new(
-            selector.into_selector(),
-            self.stream,
-            transform,
+        Api::pack(modifier::Fallible::new(
+            selector.into_selector()
+                .map(move |selector| modifier::select::SubSelectDirect::new(
+                    selector,
+                    self.stream,
+                    transform,
+                ))
+                .map_err(Into::into)
         ))
     }
 
@@ -335,6 +381,70 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
                 .map_err(Into::into)
         ))
     }
+
+    pub fn remove_class<N>(self, name: N)
+    -> Api<'t, modifier::Fallible<modifier::attribute::RemoveClass<S>>>
+    where
+        N: text::IntoIdentifier,
+    {
+        Api::pack(modifier::Fallible::new(
+            name.into_identifier()
+                .map(move |name| modifier::attribute::RemoveClass::new(self.stream, name))
+                .map_err(Into::into)
+        ))
+    }
+
+    pub fn remove_id(self)
+    -> Api<'t, modifier::attribute::RemoveAttribute<S>> {
+        Api::pack(modifier::attribute::RemoveAttribute::new(
+            self.stream,
+            text::Identifier::from_static_str("id").expect("remove_id attribute identifier"),
+        ))
+    }
+
+    pub fn set_id<N>(self, id: N)
+    -> Api<'t, modifier::Fallible<modifier::attribute::SetAttribute<S>>>
+    where
+        N: text::IntoIdentifier,
+    {
+        Api::pack(modifier::Fallible::new(
+            id.into_identifier()
+                .map(move |id| modifier::attribute::SetAttribute::new(
+                    self.stream,
+                    text::Identifier::from_static_str("id")
+                        .expect("remove_id attribute identifier"),
+                    Some(id.into_value()),
+                ))
+                .map_err(Into::into)
+        ))
+    }
+
+    pub fn add_class<N>(self, name: N)
+    -> Api<'t, modifier::Fallible<modifier::attribute::AddToAttribute<S>>>
+    where
+        N: text::IntoIdentifier,
+    {
+        Api::pack(modifier::Fallible::new(
+            name.into_identifier()
+                .map(move |name| modifier::attribute::AddToAttribute::new(
+                    self.stream,
+                    text::Identifier::from_static_str("class")
+                        .expect("add_class attribute identifier"),
+                    name.into_value(),
+                    text::Value::from_unencoded_static_str(" "),
+                ))
+                .map_err(Into::into)
+        ))
+    }
+
+    pub fn apply_as_boxed_element<B, X>(self, builder: B) -> Api<'t, X>
+    where
+        B: for<'tb> FnOnce(BoxedElementApi<'tb>) -> Api<'tb, X>,
+        X: event::Stream,
+        S: 'static,
+    {
+        builder(self.into_boxed_element())
+    }
 }
 
 pub(crate) trait BuildOnce<S> {
@@ -354,5 +464,82 @@ where
 
     fn build_once(self, stream: S) -> R {
         apply_once(stream, self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::{ FromStr };
+
+    #[test]
+    fn apply_as_boxed_element() {
+
+        fn map_boxed_elem(api: ::BoxedElementApi) -> ::BoxedElementApi {
+            api.remove_contents().into_boxed_element()
+        }
+
+        test_transform!(
+            Default::default(),
+            "<a>01<b>23</b>45</a>",
+            "<a>01<b></b>45</a>",
+            |html| html
+                .select(::select::Tag::from_str("b"), |html|
+                    html.apply_as_boxed_element(map_boxed_elem)
+                )
+        );
+    }
+
+    #[test]
+    fn into_boxed_element() {
+
+        fn map_boxed_elem(api: ::BoxedElementApi) -> ::BoxedElementApi {
+            api.remove_contents().into_boxed_element()
+        }
+
+        test_transform!(
+            Default::default(),
+            "<a>01<b>23</b>45</a>",
+            "<a>01<b></b>45</a>",
+            |html| html
+                .select(::select::Tag::from_str("b"), |html|
+                    map_boxed_elem(html.into_boxed_element())
+                )
+        );
+    }
+
+    #[test]
+    fn apply_as_boxed() {
+
+        fn map_boxed(api: ::BoxedApi) -> ::BoxedApi {
+            api.remove().into_boxed()
+        }
+
+        test_transform!(
+            Default::default(),
+            "<a>01<b>23</b>45</a>",
+            "<a>0145</a>",
+            |html| html
+                .select(::select::Tag::from_str("b"), |html|
+                    html.apply_as_boxed(map_boxed)
+                )
+        );
+    }
+
+    #[test]
+    fn into_boxed() {
+
+        fn map_boxed(api: ::BoxedApi) -> ::BoxedApi {
+            api.remove().into_boxed()
+        }
+
+        test_transform!(
+            Default::default(),
+            "<a>01<b>23</b>45</a>",
+            "<a>0145</a>",
+            |html| html
+                .select(::select::Tag::from_str("b"), |html|
+                    map_boxed(html.into_boxed())
+                )
+        );
     }
 }

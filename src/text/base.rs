@@ -17,7 +17,7 @@ impl Text {
         self.value
     }
 
-    pub(crate) fn from_static(value: &'static str) -> Text {
+    pub(crate) fn from_static_str(value: &'static str) -> Text {
         Text {
             value: text::Deferred::StaticStr(value),
         }

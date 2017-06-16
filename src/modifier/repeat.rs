@@ -5,6 +5,7 @@ use transform;
 use template;
 
 pub type Source = template::TemplateStream;
+pub type Derived<D> = event::DerivedStream<template::TemplateStream, D>;
 
 #[derive(Debug)]
 pub struct Repeat<S, I, B, X>

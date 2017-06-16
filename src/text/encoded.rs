@@ -46,13 +46,30 @@ pub struct EncodedText {
 
 impl EncodedText {
 
-    pub(crate) fn from_encoded_tendril(tendril: tendril::StrTendril) -> EncodedText {
+    pub(crate) fn new() -> EncodedText {
+        let tendril = tendril::StrTendril::new();
         EncodedText {
             value: text::Deferred::Actual(tendril),
         }
     }
 
-    pub(crate) fn from_unencoded_static(value: &'static str) -> EncodedText {
+    pub(crate) fn push_encoded_str(&mut self, value: &str) {
+        self.value.actual().push_slice(value)
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+
+    pub(crate) fn from_deferred(value: text::Deferred<tendril::StrTendril>) -> EncodedText {
+        EncodedText { value }
+    }
+
+    pub(crate) fn from_encoded_tendril(tendril: tendril::StrTendril) -> EncodedText {
+        EncodedText::from_deferred(text::Deferred::Actual(tendril))
+    }
+
+    pub(crate) fn from_unencoded_static_str(value: &'static str) -> EncodedText {
         EncodedText {
             value: encode_str_optional(value)
                 .map(text::Deferred::Actual)
@@ -71,7 +88,7 @@ impl EncodedText {
         }
     }
 
-    pub(crate) fn from_unencoded(value: &str) -> EncodedText {
+    pub(crate) fn from_unencoded_str(value: &str) -> EncodedText {
         EncodedText {
             value: text::Deferred::Actual(value.into()),
         }
@@ -83,7 +100,7 @@ impl EncodedText {
         }
     }
 
-    pub fn as_ref(&self) -> EncodedStr {
+    pub fn as_encoded_ref(&self) -> EncodedStr {
         EncodedStr {
             content: &self.value,
         }
@@ -117,5 +134,16 @@ impl<'a> fmt::Display for EncodedStr<'a> {
 
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(self.content, fmt)
+    }
+}
+
+impl<'a> EncodedStr<'a> {
+
+    pub(crate) fn split_whitespace(&self) -> str::SplitWhitespace<'a> {
+        self.content.split_whitespace()
+    }
+
+    pub(crate) fn identifier_eq(&self, value: &str) -> bool {
+        text::identifier_eq(self.content, value)
     }
 }

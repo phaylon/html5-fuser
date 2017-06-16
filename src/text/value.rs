@@ -20,22 +20,46 @@ impl fmt::Display for Value {
 
 impl Value {
 
+    pub(crate) fn new() -> Value {
+        Value {
+            text: text::EncodedText::new(),
+        }
+    }
+
+    pub(crate) fn from_deferred(deferred: text::Deferred<tendril::StrTendril>) -> Value {
+        Value {
+            text: text::EncodedText::from_deferred(deferred),
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    pub(crate) fn push_encoded_str(&mut self, value: &str) {
+        self.text.push_encoded_str(value)
+    }
+
     pub(crate) fn from_raw(value: &str) -> Value {
         Value {
             text: text::EncodedText::from_raw(value),
         }
     }
 
-    pub fn from_unencoded(value: &str) -> Value {
+    pub fn from_unencoded_str(value: &str) -> Value {
         Value {
-            text: text::EncodedText::from_unencoded(value),
+            text: text::EncodedText::from_unencoded_str(value),
         }
     }
 
-    pub fn from_unencoded_static(value: &'static str) -> Value {
+    pub fn from_unencoded_static_str(value: &'static str) -> Value {
         Value {
-            text: text::EncodedText::from_unencoded_static(value),
+            text: text::EncodedText::from_unencoded_static_str(value),
         }
+    }
+
+    pub fn as_encoded_ref(&self) -> text::EncodedStr {
+        self.text.as_encoded_ref()
     }
 
     pub(crate) fn join(self, other: Value) -> Value {
@@ -58,14 +82,14 @@ impl IntoValue for Value {
 impl IntoValue for String {
 
     fn into_value(self) -> Value {
-        Value::from_unencoded(&self)
+        Value::from_unencoded_str(&self)
     }
 }
 
 impl IntoValue for &'static str {
 
     fn into_value(self) -> Value {
-        Value::from_unencoded_static(self)
+        Value::from_unencoded_static_str(self)
     }
 }
 

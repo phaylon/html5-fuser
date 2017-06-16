@@ -3,9 +3,12 @@ use std::rc;
 use std::cell;
 use std::fmt;
 use std::error;
+use std::str;
+use std::marker;
 
 use text;
 use template;
+use select;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -70,7 +73,7 @@ impl Event {
 
     pub(crate) fn is_closing_tag_for_str(&self, tag_name: &str) -> bool {
         match *self {
-            Event::ClosingTag { ref tag, .. } => text::identifier_eq(tag, tag_name),
+            Event::ClosingTag { ref tag, .. } => tag.is_eq(tag_name),
             _ => false,
         }
     }
@@ -268,6 +271,43 @@ impl Attributes {
         attributes.push(Attribute { name, value });
         Attributes::new(attributes)
     }
+
+    pub(crate) fn remove_class(self, name: text::Identifier)
+    -> Attributes {
+        if self.has_class(&name) {
+            let mut attributes = Vec::new();
+            for attribute in self.items.iter().cloned() {
+                if let Some(attribute) = attribute.remove_class(&name) {
+                    attributes.push(attribute);
+                }
+            }
+            Attributes::new(attributes)
+        } else {
+            self
+        }
+    }
+
+    pub(crate) fn has_class(&self, name: &str) -> bool {
+        for attribute in self.items.iter() {
+            if attribute.has_class(name) {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub(crate) fn has_id(&self, id: &str) -> bool {
+        for attribute in self.items.iter() {
+            if attribute.name.is_eq("id") {
+                if let Some(ref value) = attribute.value {
+                    if value.as_encoded_ref().identifier_eq(id) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
 }
 
 impl fmt::Display for Attributes {
@@ -292,12 +332,91 @@ pub struct Attribute {
     value: Option<text::Value>,
 }
 
+pub(crate) struct Classes<'s> {
+    iter: str::SplitWhitespace<'s>,
+}
+
+impl<'s> Iterator for Classes<'s> {
+
+    type Item = &'s str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            return match self.iter.next() {
+                None => None,
+                Some(value) =>
+                    if !value.is_empty() {
+                        Some(value)
+                    } else {
+                        continue;
+                    },
+            };
+        }
+    }
+}
+
 impl Attribute {
 
     pub(crate) fn new(name: text::Identifier, value: Option<text::Value>) -> Attribute {
         Attribute {
             name: name,
             value: value,
+        }
+    }
+
+    pub(crate) fn classes(&self) -> Option<Classes> {
+        if self.name.is_eq("class") {
+            return self.value.as_ref().map(|value|
+                Classes { iter: value.as_encoded_ref().split_whitespace() }
+            );
+        }
+        None
+    }
+
+    pub(crate) fn has_class(&self, name: &str) -> bool {
+        if let Some(classes) = self.classes() {
+            for class in classes {
+                if text::identifier_eq(name, class) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub(crate) fn remove_class(self, name: &str) -> Option<Attribute> {
+
+        fn make_without(attribute: &Attribute, name: &str) -> Option<text::Value> {
+            if !attribute.has_class(name) {
+                return None;
+            }
+            let classes = match attribute.classes() {
+                None => return None,
+                Some(iter) => iter,
+            };
+            let mut new_classes = text::Value::new();
+            for class in classes {
+                if !text::identifier_eq(name, class) {
+                    if !new_classes.is_empty() {
+                        new_classes.push_encoded_str(" ");
+                    }
+                    new_classes.push_encoded_str(class);
+                }
+            }
+            Some(new_classes)
+        }
+
+        match make_without(&self, name) {
+            None => Some(self),
+            Some(new_classes) =>
+                if new_classes.is_empty() {
+                    None
+                } else {
+                    Some(Attribute {
+                        name: self.name,
+                        value: Some(new_classes),
+                    })
+                },
         }
     }
 }
@@ -331,6 +450,12 @@ pub enum StreamError {
     Identifier {
         error: text::IdentifierError,
     },
+    Selector {
+        error: select::Error,
+    },
+    StaticSelector {
+        error: select::StaticError,
+    },
 }
 
 impl fmt::Display for StreamError {
@@ -345,6 +470,10 @@ impl fmt::Display for StreamError {
                 write!(fmt, "Input error for inserted file content stream"),
             StreamError::Identifier { .. } =>
                 write!(fmt, "Invalid attribute identifier"),
+            StreamError::Selector { .. } =>
+                write!(fmt, "Invalid element selector"),
+            StreamError::StaticSelector { .. } =>
+                write!(fmt, "Invalid static str selector"),
         }
     }
 }
@@ -359,6 +488,8 @@ impl error::Error for StreamError {
             StreamError::Input { ref error } => Some(error),
             StreamError::File { ref error } => Some(error),
             StreamError::Identifier { ref error } => Some(error),
+            StreamError::Selector { ref error } => Some(error),
+            StreamError::StaticSelector { ref error } => Some(error),
         }
     }
 }
@@ -449,7 +580,7 @@ pub trait Stream {
     }
 }
 
-impl<T> Stream for Box<T> where T: Stream {
+impl<T> Stream for Box<T> where T: Stream + ?Sized {
 
     fn next_event(&mut self) -> StreamResult {
         (**self).next_event()
@@ -465,7 +596,7 @@ impl<T> Stream for rc::Rc<cell::RefCell<T>> where T: Stream {
 
 pub trait ElementStream: Stream {}
 
-impl<T> ElementStream for Box<T> where T: ElementStream {}
+impl<T> ElementStream for Box<T> where T: ElementStream + ?Sized {}
 
 pub trait IntoStream {
 
@@ -474,44 +605,33 @@ pub trait IntoStream {
     fn into_stream(self) -> Self::Stream;
 }
 
-impl<S> IntoStream for S where S: Stream {
-
-    type Stream = S;
-
-    fn into_stream(self) -> S { self }
-}
-
-impl<S, E> IntoStream for Result<S, E>
-where
-    S: IntoStream,
-    E: Into<StreamError>,
-{
-    type Stream = TryStream<S::Stream>;
-
-    fn into_stream(self) -> Self::Stream {
-        TryStream {
-            stream: self
-                .map(IntoStream::into_stream)
-                .map_err(Into::into)
-                .map_err(Some),
-        }
-    }
-}
-
 #[derive(Debug)]
-pub struct TryStream<S> {
-    stream: Result<S, Option<StreamError>>,
+pub struct DerivedStream<S, D> {
+    stream: S,
+    _derived_from: marker::PhantomData<D>,
 }
 
-impl<S> Stream for TryStream<S> where S: Stream {
+impl<S, D> DerivedStream<S, D> {
 
-    fn next_event(&mut self) -> StreamResult {
-        match self.stream {
-            Ok(ref mut stream) => stream.next_event(),
-            Err(ref mut error) => match error.take() {
-                Some(error) => Err(error),
-                None => Ok(None),
-            },
+    pub(crate) fn new(stream: S) -> DerivedStream<S, D> {
+        DerivedStream {
+            stream,
+            _derived_from: marker::PhantomData,
         }
     }
 }
+
+impl<S, D> Stream for DerivedStream<S, D>
+where
+    S: Stream,
+{
+    fn next_event(&mut self) -> StreamResult {
+        self.stream.next_event()
+    }
+}
+
+impl<S, D> ElementStream for DerivedStream<S, D>
+where
+    D: ElementStream,
+    S: Stream,
+{}

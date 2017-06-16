@@ -17,6 +17,16 @@ impl<T> Deferred<T> where T: From<&'static str> {
             Deferred::Actual(value) => value,
         }
     }
+
+    pub(crate) fn actual(&mut self) -> &mut T {
+        if let Deferred::StaticStr(value) = *self {
+            *self = Deferred::Actual(value.into());
+        }
+        match *self {
+            Deferred::StaticStr(_) => panic!("unexpected static storage"),
+            Deferred::Actual(ref mut value) => value,
+        }
+    }
 }
 
 impl<T> fmt::Display for Deferred<T> where T: fmt::Display {

@@ -37,6 +37,33 @@ where
 }
 
 #[derive(Debug)]
+pub struct RemoveClass<S> {
+    state: modifier::State<State<S, text::Identifier>>,
+}
+
+impl<S> event::Stream for RemoveClass<S> where S: event::Stream {
+
+    fn next_event(&mut self) -> event::StreamResult {
+        self.state.step(|state| attribute_step(state, |attributes, name|
+            attributes.remove_class(name)
+        ))
+    }
+}
+
+impl<S> RemoveClass<S> where S: event::Stream {
+
+    pub(crate) fn new(stream: S, name: text::Identifier)
+    -> RemoveClass<S> {
+        RemoveClass {
+            state: modifier::State::new(State::Start {
+                stream,
+                data: name,
+            }),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct RemoveAttribute<S> {
     state: modifier::State<State<S, text::Identifier>>,
 }
@@ -178,6 +205,85 @@ impl<S> SetAttribute<S> where S: event::Stream {
 #[cfg(test)]
 mod tests {
     use std::str::{ FromStr };
+
+    #[test]
+    fn add_class() {
+        test_transform!(
+            Default::default(),
+            "<a class=\"foo bar\">23</a>",
+            "<a class=\"foo bar baz\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .add_class("baz")
+                )
+        );
+        test_transform!(
+            Default::default(),
+            "<a>23</a>",
+            "<a class=\"baz\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .add_class("baz")
+                )
+        );
+    }
+
+    #[test]
+    fn remove_class() {
+        test_transform!(
+            Default::default(),
+            "<a class=\"foo  bar baz\" id=\"xyz\">23</a>",
+            "<a class=\"foo baz\" id=\"xyz\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .remove_class("bar")
+                )
+        );
+        test_transform!(
+            Default::default(),
+            "<a class=\"bar\" id=\"xyz\">23</a>",
+            "<a id=\"xyz\">23</a>",
+            |html| html
+                .select(::select::Tag::from_str("a").unwrap(), |html| html
+                    .remove_class("bar")
+                )
+        );
+    }
+
+    #[test]
+    fn set_id() {
+        test_transform!(
+            Default::default(),
+            "<link id=\"foo\" class=\"bar\">",
+            "<link class=\"bar\" id=\"qux\">",
+            |html| html
+                .select(::select::Tag::from_str("link").unwrap(), |html| html
+                    .set_id("qux")
+                )
+        );
+        test_transform!(
+            Default::default(),
+            "<link class=\"bar\">",
+            "<link class=\"bar\" id=\"qux\">",
+            |html| html
+                .select(::select::Tag::from_str("link").unwrap(), |html| html
+                    .set_id("qux")
+                )
+        );
+    }
+
+    #[test]
+    fn remove_id() {
+        test_transform!(
+            Default::default(),
+            "<link id=\"foo\" class=\"bar\">",
+            "<link class=\"bar\">",
+            |html| html
+                .select(::select::Tag::from_str("link").unwrap(), |html| html
+                    .remove_id()
+                )
+        );
+    }
 
     #[test]
     fn void() {

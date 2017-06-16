@@ -18,13 +18,22 @@ pub struct Identifier {
 
 impl Identifier {
 
-    pub fn from_static(value: &'static str) -> Result<Identifier, IdentifierError> {
+    pub fn from_static_str(value: &'static str) -> Result<Identifier, IdentifierError> {
         Ok(Identifier {
-            value: text::Text::from_static(validate_identifier(value)?),
+            value: text::Text::from_static_str(validate(value)?),
         })
     }
 
     pub(crate) fn to_string(&self) -> String { (*self.value).into() }
+
+    pub(crate) fn is_eq(&self, value: &str) -> bool {
+        identifier_eq(self, value)
+    }
+
+    pub(crate) fn into_value(self) -> text::Value {
+        let deferred = self.value.into_deferred();
+        text::Value::from_deferred(deferred)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,7 +79,7 @@ impl error::Error for IdentifierError {
     fn description(&self) -> &str { "Invalid identifier value" }
 }
 
-fn validate_identifier(value: &str) -> Result<&str, IdentifierError> {
+pub(crate) fn validate(value: &str) -> Result<&str, IdentifierError> {
     use std::ascii::{ AsciiExt };
 
     const FORBIDDEN: &[char] = &['=', '"', '/', '>', '<', '&', ',', ';'];
@@ -104,7 +113,7 @@ impl str::FromStr for Identifier {
     type Err = IdentifierError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        validate_identifier(value)
+        validate(value)
             .map(|value| Identifier { value: value.into() })
     }
 }
@@ -143,7 +152,7 @@ impl IntoIdentifier for String {
 impl IntoIdentifier for &'static str {
 
     fn into_identifier(self) -> Result<Identifier, IdentifierError> {
-        Identifier::from_static(self)
+        Identifier::from_static_str(self)
     }
 }
 
