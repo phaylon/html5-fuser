@@ -1,10 +1,15 @@
 
+//! Basic functionality for events and event streams.
+//!
+//! Besides some common error definitions, the only item a library user might have to
+//! interact with is the `IntoStream` trait that is used when content is injected into
+//! another stream.
+
 use std::rc;
 use std::cell;
 use std::fmt;
 use std::error;
 use std::str;
-use std::marker;
 
 use text;
 use template;
@@ -58,13 +63,6 @@ impl Event {
         }
     }
 
-    pub(crate) fn is_self_contained_tag(&self) -> bool {
-        match *self {
-            Event::SelfClosedTag { .. } | Event::VoidTag { .. } => true,
-            _ => false,
-        }
-    }
-
     pub(crate) fn is_opening_tag_for(&self, tag_name: &text::Identifier) -> bool {
         self.opening_tag_name()
             .map(|name| *name == *tag_name)
@@ -97,14 +95,6 @@ impl Event {
             Event::OpeningTag { ref tag, .. } => Some(tag),
             _ => None,
         }
-    }
-
-    pub(crate) fn is_closing_tag(&self) -> bool {
-        self.closing_tag_name().is_some()
-    }
-
-    pub(crate) fn is_opening_tag(&self) -> bool {
-        self.opening_tag_name().is_some()
     }
 }
 
@@ -183,6 +173,7 @@ impl<'t, 'a> fmt::Display for TagDisplay<'t, 'a> {
     }
 }
 
+/// A sequence of attributes, in order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attributes {
     items: rc::Rc<Vec<Attribute>>,
@@ -326,6 +317,7 @@ impl fmt::Display for Attributes {
     }
 }
 
+/// A single attribute with an optional value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attribute {
     name: text::Identifier,
@@ -436,10 +428,44 @@ impl fmt::Display for Attribute {
 
 pub type StreamResult = Result<Option<Event>, StreamError>;
 
+/// Occurs when an internal invariant wasn't upheld.
+///
+/// This kind of error should usually not happen and is indicative of a logic or API bug.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AssertionError {
+    /// The processed stream was malformed and did not produce an expected sequence or
+    /// pattern of events.
+    Malformed {
+        /// More details about why the stream was considered malformed.
+        error: MalformedReason,
+    },
+}
+
+impl fmt::Display for AssertionError {
+
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            AssertionError::Malformed { .. } =>
+                write!(fmt, "Malformed event stream"),
+        }
+    }
+}
+
+impl error::Error for AssertionError {
+
+    fn description(&self) -> &str { "Assertion error" }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            AssertionError::Malformed { ref error } => Some(error),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum StreamError {
-    Malformed {
-        error: MalformedReason,
+    Assertion {
+        error: AssertionError,
     },
     Input {
         error: template::InputError,
@@ -462,8 +488,8 @@ impl fmt::Display for StreamError {
 
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            StreamError::Malformed { ref error } =>
-                write!(fmt, "Malformed event stream: {}", error),
+            StreamError::Assertion { .. } =>
+                write!(fmt, "An internal invariant was not upheld"),
             StreamError::Input { .. } =>
                 write!(fmt, "Input error for inserted content stream"),
             StreamError::File { .. } =>
@@ -484,7 +510,7 @@ impl error::Error for StreamError {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            StreamError::Malformed { .. } => None,
+            StreamError::Assertion { ref error } => Some(error),
             StreamError::Input { ref error } => Some(error),
             StreamError::File { ref error } => Some(error),
             StreamError::Identifier { ref error } => Some(error),
@@ -517,25 +543,51 @@ impl From<text::IdentifierError> for StreamError {
 
 impl StreamError {
 
+    pub(crate) fn unexpected_close(tag_name: String) -> StreamError {
+        StreamError::Assertion {
+            error: AssertionError::Malformed {
+                error: MalformedReason::UnexpectedClosingTag { tag_name },
+            },
+        }
+    }
+
     pub(crate) fn missing_close(tag_name: String) -> StreamError {
-        StreamError::Malformed {
-            error: MalformedReason::MissingClosingTag { tag_name },
+        StreamError::Assertion {
+            error: AssertionError::Malformed {
+                error: MalformedReason::MissingClosingTag { tag_name },
+            },
+        }
+    }
+
+    pub(crate) fn expected_close(found_event: Option<Event>) -> StreamError {
+        StreamError::Assertion {
+            error: AssertionError::Malformed {
+                error: MalformedReason::ExpectedClosingTag { found_event },
+            },
         }
     }
 
     pub(crate) fn expected_open(found_event: Option<Event>) -> StreamError {
-        StreamError::Malformed {
-            error: MalformedReason::ExpectedOpeningTag { found_event },
+        StreamError::Assertion {
+            error: AssertionError::Malformed {
+                error: MalformedReason::ExpectedOpeningTag { found_event },
+            },
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MalformedReason {
+    UnexpectedClosingTag {
+        tag_name: String,
+    },
     MissingClosingTag {
         tag_name: String,
     },
     ExpectedOpeningTag {
+        found_event: Option<Event>,
+    },
+    ExpectedClosingTag {
         found_event: Option<Event>,
     },
 }
@@ -544,6 +596,8 @@ impl fmt::Display for MalformedReason {
 
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            MalformedReason::UnexpectedClosingTag { ref tag_name } =>
+                write!(fmt, "Unexpected closing tag for '{}'", tag_name),
             MalformedReason::MissingClosingTag { ref tag_name } =>
                 write!(fmt, "Missing closing tag for '{}'", tag_name),
             MalformedReason::ExpectedOpeningTag { ref found_event } =>
@@ -552,8 +606,19 @@ impl fmt::Display for MalformedReason {
                         .map(Event::description)
                         .unwrap_or("end of input"),
                 ),
+            MalformedReason::ExpectedClosingTag { ref found_event } =>
+                write!(fmt, "Expected closing tag, found {}",
+                     found_event.as_ref()
+                        .map(Event::description)
+                        .unwrap_or("end of input"),
+                ),
         }
     }
+}
+
+impl error::Error for MalformedReason {
+
+    fn description(&self) -> &str { "Stream validity error" }
 }
 
 #[cfg(test)]
@@ -587,16 +652,18 @@ impl<T> Stream for Box<T> where T: Stream + ?Sized {
     }
 }
 
-impl<T> Stream for rc::Rc<cell::RefCell<T>> where T: Stream {
+impl<T> ElementStream for Box<T> where T: ElementStream + ?Sized {}
+
+impl<T> Stream for rc::Rc<cell::RefCell<T>> where T: Stream + ?Sized {
 
     fn next_event(&mut self) -> StreamResult {
         self.borrow_mut().next_event()
     }
 }
 
-pub trait ElementStream: Stream {}
+impl<T> ElementStream for rc::Rc<cell::RefCell<T>> where T: ElementStream + ?Sized {}
 
-impl<T> ElementStream for Box<T> where T: ElementStream + ?Sized {}
+pub trait ElementStream: Stream {}
 
 pub trait IntoStream {
 
@@ -604,34 +671,3 @@ pub trait IntoStream {
 
     fn into_stream(self) -> Self::Stream;
 }
-
-#[derive(Debug)]
-pub struct DerivedStream<S, D> {
-    stream: S,
-    _derived_from: marker::PhantomData<D>,
-}
-
-impl<S, D> DerivedStream<S, D> {
-
-    pub(crate) fn new(stream: S) -> DerivedStream<S, D> {
-        DerivedStream {
-            stream,
-            _derived_from: marker::PhantomData,
-        }
-    }
-}
-
-impl<S, D> Stream for DerivedStream<S, D>
-where
-    S: Stream,
-{
-    fn next_event(&mut self) -> StreamResult {
-        self.stream.next_event()
-    }
-}
-
-impl<S, D> ElementStream for DerivedStream<S, D>
-where
-    D: ElementStream,
-    S: Stream,
-{}

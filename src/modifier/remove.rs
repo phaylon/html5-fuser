@@ -2,6 +2,7 @@
 use event;
 use modifier;
 use transform;
+use builder;
 
 #[derive(Debug)]
 pub struct Remove<S> {
@@ -23,38 +24,39 @@ impl<S> event::Stream for Remove<S> where S: event::Stream {
     }
 }
 
-#[derive(Debug)]
-pub struct RemoveContents<S> where S: event::Stream {
-    stream: modifier::select::ContentActorOnce<S, BuildRemove>,
+pub struct RemoveContent<S> where S: event::ElementStream {
+    stream: modifier::select::SelectContent<S, Builder>,
 }
 
-impl<S> RemoveContents<S> where S: event::Stream {
+impl<S> RemoveContent<S> where S: event::ElementStream {
 
-    pub(crate) fn new(stream: S) -> RemoveContents<S> {
-        RemoveContents {
-            stream: modifier::select::ContentActorOnce::new(stream, BuildRemove),
+    pub(crate) fn new(stream: S) -> RemoveContent<S> {
+        RemoveContent {
+            stream: modifier::select::SelectContent::new(stream, Builder),
         }
     }
 }
 
-impl<S> event::Stream for RemoveContents<S> where S: event::Stream {
+impl<S> event::ElementStream for RemoveContent<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for RemoveContent<S> where S: event::ElementStream {
 
     fn next_event(&mut self) -> event::StreamResult {
         self.stream.next_event()
     }
 }
 
-impl<S> event::ElementStream for RemoveContents<S> where S: event::Stream {}
+struct Builder;
 
-#[derive(Debug)]
-struct BuildRemove;
+impl<S> builder::BuildOnce<modifier::select::CurrentContent<S>> for Builder
+where
+    S: event::ElementStream,
+{
+    type Stream = Remove<modifier::select::CurrentContent<S>>;
 
-impl<S> transform::BuildOnce<S> for BuildRemove where S: event::Stream {
-
-    type Stream = Remove<S>;
-
-    fn build_once(self, stream: S) -> Self::Stream {
-        Remove { stream }
+    fn build_once(self, stream: transform::Api<modifier::select::CurrentContent<S>>)
+    -> transform::Api<Self::Stream> {
+        transform::Api::pack(Remove::new(stream.unpack()))
     }
 }
 

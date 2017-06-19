@@ -2,8 +2,8 @@
 use event;
 use modifier;
 use transform;
+use builder;
 
-#[derive(Debug)]
 pub struct Prepend<S, N> {
     stream: modifier::Combine<N, S>,
 }
@@ -13,9 +13,9 @@ where
     S: event::Stream,
     N: event::Stream,
 {
-    pub(crate) fn new(stream: S, prepend: N) -> Prepend<S, N> {
+    pub(crate) fn new(stream: S, new_stream: N) -> Prepend<S, N> {
         Prepend {
-            stream: modifier::Combine::new(prepend, stream),
+            stream: modifier::Combine::new(new_stream, stream),
         }
     }
 }
@@ -30,59 +30,56 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct PrependContents<S, N>
+pub struct PrependContent<S, N>
 where
-    S: event::Stream,
+    S: event::ElementStream,
     N: event::Stream,
 {
-    stream: modifier::select::ContentActorOnce<S, BuildPrepend<N>>,
+    stream: modifier::select::SelectContent<S, Builder<N>>,
 }
 
-impl<S, N> PrependContents<S, N>
+impl<S, N> PrependContent<S, N>
 where
-    S: event::Stream,
+    S: event::ElementStream,
     N: event::Stream,
 {
-    pub(crate) fn new(stream: S, prepend: N) -> PrependContents<S, N> {
-        PrependContents {
-            stream: modifier::select::ContentActorOnce::new(stream, BuildPrepend {
-                stream: prepend,
-            }),
+    pub(crate) fn new(stream: S, new_stream: N) -> PrependContent<S, N> {
+        PrependContent {
+            stream: modifier::select::SelectContent::new(stream, Builder { new_stream }),
         }
     }
 }
 
-#[derive(Debug)]
-struct BuildPrepend<N> {
-    stream: N,
-}
-
-impl<S, N> transform::BuildOnce<S> for BuildPrepend<N>
+impl<S, N> event::ElementStream for PrependContent<S, N>
 where
-    S: event::Stream,
-    N: event::Stream,
-{
-    type Stream = modifier::Combine<N, S>;
-
-    fn build_once(self, stream: S) -> Self::Stream {
-        modifier::Combine::new(self.stream, stream)
-    }
-}
-
-impl<S, N> event::ElementStream for PrependContents<S, N>
-where
-    S: event::Stream,
+    S: event::ElementStream,
     N: event::Stream,
 {}
 
-impl<S, N> event::Stream for PrependContents<S, N>
+impl<S, N> event::Stream for PrependContent<S, N>
 where
-    S: event::Stream,
+    S: event::ElementStream,
     N: event::Stream,
 {
     fn next_event(&mut self) -> event::StreamResult {
         self.stream.next_event()
+    }
+}
+
+struct Builder<N> {
+    new_stream: N,
+}
+
+impl<S, N> builder::BuildOnce<modifier::select::CurrentContent<S>> for Builder<N>
+where
+    S: event::ElementStream,
+    N: event::Stream,
+{
+    type Stream = Prepend<modifier::select::CurrentContent<S>, N>;
+
+    fn build_once(self, stream: transform::Api<modifier::select::CurrentContent<S>>)
+    -> transform::Api<Self::Stream> {
+        transform::Api::pack(Prepend::new(stream.unpack(), self.new_stream))
     }
 }
 

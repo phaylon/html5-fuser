@@ -23,6 +23,12 @@ impl<S1, S2> ApplyEither<S1, S2> {
     }
 }
 
+impl<S1, S2> event::ElementStream for ApplyEither<S1, S2>
+where
+    S1: event::ElementStream,
+    S2: event::ElementStream,
+{}
+
 impl<S1, S2> event::Stream for ApplyEither<S1, S2>
 where
     S1: event::Stream,

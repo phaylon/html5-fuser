@@ -222,13 +222,12 @@ impl Template {
         })
     }
 
-    pub fn transform<F, R>(&self, transform_builder: F)
-        -> Result<Template, event::StreamError>
+    pub fn transform<B, R>(&self, builder: B) -> Result<Template, event::StreamError>
     where
-        F: for<'t> FnOnce(transform::Api<'t, TemplateStream>) -> transform::Api<'t, R>,
+        B: for<'t> FnOnce(transform::Api<'t, TemplateStream>) -> transform::Api<'t, R>,
         R: event::Stream,
     {
-        let stream = transform::apply_once(self.to_stream(), transform_builder);
+        let stream = transform::build_once(self.to_stream(), builder);
         Template::from_stream(stream)
     }
 }

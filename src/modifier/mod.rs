@@ -1,24 +1,46 @@
 
+use std::marker;
+
 use event;
 use text;
 
 pub mod select;
 pub mod remove;
 pub mod prepend;
-pub mod replace;
 pub mod append;
+pub mod replace;
 pub mod repeat;
 pub mod apply;
 pub mod attribute;
 
-fn passthrough<S, T, F>(mut stream: S, cont_state: F) -> StateResult<T>
-where
-    F: FnOnce(S) -> T,
-    S: event::Stream,
-{
-    match stream.next_event()? {
-        Some(event) => Ok(Some((event, Some(cont_state(stream))))),
-        None => Ok(None),
+#[derive(Debug)]
+pub(crate) struct Level {
+    depth: usize,
+}
+
+impl Level {
+
+    pub(crate) fn new() -> Level {
+        Level {
+            depth: 0,
+        }
+    }
+
+    pub(crate) fn is_top_level(&self) -> bool {
+        self.depth == 0
+    }
+
+    pub(crate) fn adjust(self, event: &event::Event) -> Result<Level, event::StreamError> {
+        if event.opening_tag_name().is_some() {
+            Ok(Level { depth: self.depth + 1 })
+        } else if let Some(name) = event.closing_tag_name() {
+            if self.depth == 0 {
+                return Err(event::StreamError::unexpected_close(name.to_string()));
+            }
+            Ok(Level { depth: self.depth - 1 })
+        } else {
+            Ok(Level { depth: self.depth })
+        }
     }
 }
 
@@ -50,6 +72,17 @@ impl<T> State<T> {
         };
         self.inner = new_state;
         Ok(Some(result))
+    }
+}
+
+fn passthrough<S, T, F>(mut stream: S, cont_state: F) -> StateResult<T>
+where
+    F: FnOnce(S) -> T,
+    S: event::Stream,
+{
+    match stream.next_event()? {
+        Some(event) => Ok(Some((event, Some(cont_state(stream))))),
+        None => Ok(None),
     }
 }
 
@@ -94,6 +127,62 @@ impl<S> event::Stream for Fallible<S> where S: event::Stream {
 }
 
 #[derive(Debug)]
+struct Expand<S> {
+    state: State<ExpandState<S>>,
+}
+
+impl<S> Expand<S> {
+
+    pub fn new(stream: S) -> Expand<S> {
+        Expand {
+            state: State::new(ExpandState::Start { stream: stream }),
+        }
+    }
+}
+
+impl<S> event::ElementStream for Expand<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for Expand<S> where S: event::Stream {
+
+    fn next_event(&mut self) -> event::StreamResult {
+        self.state.step(|state| match state {
+            ExpandState::Start { mut stream } => match stream.next_event_skip_noop()? {
+                Some(event::Event::OpeningTag { tag, attributes }) =>
+                    Ok(Some((
+                        event::open(tag, attributes),
+                        Some(ExpandState::EmitStream { stream }),
+                    ))),
+                Some(event::Event::SelfClosedTag { tag, attributes }) =>
+                    Ok(Some((
+                        event::open(tag.clone(), attributes),
+                        Some(ExpandState::EmitClosingTag { tag }),
+                    ))),
+                Some(event::Event::VoidTag { tag, attributes }) =>
+                    Ok(Some((event::void(tag, attributes), None))),
+                other => Err(event::StreamError::expected_open(other)),
+            },
+            ExpandState::EmitStream { stream } =>
+                passthrough(stream, |stream| ExpandState::EmitStream { stream }),
+            ExpandState::EmitClosingTag { tag } =>
+                Ok(Some((event::close(tag), None))),
+        })
+    }
+}
+
+#[derive(Debug)]
+enum ExpandState<S> {
+    Start {
+        stream: S,
+    },
+    EmitStream {
+        stream: S,
+    },
+    EmitClosingTag {
+        tag: text::Identifier,
+    },
+}
+
+#[derive(Debug)]
 struct Peek<S> {
     stream: S,
     buffered: Option<event::Event>,
@@ -101,18 +190,14 @@ struct Peek<S> {
 
 impl<S> Peek<S> where S: event::Stream {
 
-    pub fn new(stream: S) -> Peek<S> {
+    pub(crate) fn new(stream: S) -> Peek<S> {
         Peek {
             stream,
             buffered: None,
         }
     }
 
-    pub fn take_peeked(&mut self) -> Option<event::Event> {
-        self.buffered.take()
-    }
-
-    pub fn peek<F, R>(&mut self, peeker: F) -> Result<Option<R>, event::StreamError>
+    pub(crate) fn peek<F, R>(&mut self, peeker: F) -> Result<Option<R>, event::StreamError>
     where
         F: for<'e> FnOnce(&'e event::Event) -> R,
     {
@@ -177,106 +262,38 @@ enum CombineState<S1, S2> {
     Second(S2),
 }
 
-#[derive(Debug)]
-struct Expand<S> {
-    state: State<ExpandState<S>>,
+pub struct Derived<S, D> {
+    stream: S,
+    _derived_from: marker::PhantomData<D>,
 }
 
-impl<S> Expand<S> {
+impl<S, D> Derived<S, D> {
 
-    pub fn new(stream: S) -> Expand<S> {
-        Expand {
-            state: State::new(ExpandState::Start { stream: stream }),
+    pub(crate) fn new(stream: S) -> Derived<S, D> {
+        Derived {
+            stream,
+            _derived_from: marker::PhantomData,
         }
     }
 }
 
-impl<S> event::ElementStream for Expand<S> where S: event::Stream {}
-
-impl<S> event::Stream for Expand<S> where S: event::Stream {
-
+impl<S, D> event::Stream for Derived<S, D>
+where
+    S: event::Stream,
+{
     fn next_event(&mut self) -> event::StreamResult {
-        self.state.step(|state| match state {
-            ExpandState::Start { mut stream } => match stream.next_event_skip_noop()? {
-                Some(event::Event::OpeningTag { tag, attributes }) =>
-                    Ok(Some((
-                        event::open(tag, attributes),
-                        Some(ExpandState::EmitStream { stream }),
-                    ))),
-                Some(event::Event::SelfClosedTag { tag, attributes }) =>
-                    Ok(Some((
-                        event::open(tag.clone(), attributes),
-                        Some(ExpandState::EmitClosingTag { tag }),
-                    ))),
-                Some(event::Event::VoidTag { tag, attributes }) =>
-                    Ok(Some((event::void(tag, attributes), None))),
-                other => Err(event::StreamError::expected_open(other)),
-            },
-            ExpandState::EmitStream { stream } =>
-                passthrough(stream, |stream| ExpandState::EmitStream { stream }),
-            ExpandState::EmitClosingTag { tag } =>
-                Ok(Some((event::close(tag), None))),
-        })
+        self.stream.next_event()
     }
 }
 
-#[derive(Debug)]
-enum ExpandState<S> {
-    Start {
-        stream: S,
-    },
-    EmitStream {
-        stream: S,
-    },
-    EmitClosingTag {
-        tag: text::Identifier,
-    },
-}
+impl<S, D> event::ElementStream for Derived<S, D>
+where
+    D: event::ElementStream,
+    S: event::Stream,
+{}
 
 #[cfg(test)]
 mod tests {
-
-    #[test]
-    fn peek() {
-        use ::event::{ Stream };
-        let stream = ::event::IntoStream::into_stream(
-            ::Template::from_str("<b></b>", Default::default()).unwrap(),
-        );
-        let mut peek = super::Peek::new(stream);
-        assert_eq!(
-            peek.peek(|_| ()).unwrap(),
-            Some(())
-        );
-        assert_eq!(
-            peek.take_peeked().unwrap(),
-            ::event::Event::OpeningTag {
-                tag: "b".parse().unwrap(),
-                attributes: ::event::Attributes::new(Vec::new()),
-            }
-        );
-        assert_eq!(
-            peek.peek(|_| ()).unwrap(),
-            Some(())
-        );
-        assert_eq!(
-            peek.next_event().unwrap().unwrap(),
-            ::event::Event::ClosingTag {
-                tag: "b".parse().unwrap(),
-            }
-        );
-        assert_eq!(
-            peek.peek(|_| ()).unwrap(),
-            None
-        );
-        assert_eq!(
-            peek.next_event().unwrap(),
-            None
-        );
-        assert_eq!(
-            peek.take_peeked(),
-            None
-        );
-    }
 
     #[test]
     fn expand() {
