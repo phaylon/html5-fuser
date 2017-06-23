@@ -1,4 +1,13 @@
 
+//! Stream selection functionality.
+//!
+//! This functionality is used when substreams are selected, via `Api::select` and similar.
+//!
+//! These methods usually take anything implementing `IntoSelector`. That allows supplying
+//! pre-built and verified selectors, selector construction results and static strings. For
+//! results and static selectors any selector errors will be propagated through the stream,
+//! halting the transform.
+
 use std::str;
 use std::rc;
 use std::fmt;
@@ -7,30 +16,40 @@ use std::error;
 use text;
 use event;
 
+/// Trait implemented by all selectors.
 pub trait Selector {
 
-    fn matches(&self, tag: &text::Identifier, attributes: &event::Attributes) -> bool;
+    /// Determines if the given event matches the selector.
+    fn matches(&self, event: &event::Event) -> bool;
 }
 
 impl<T> Selector for rc::Rc<T> where T: Selector {
     
-    fn matches(&self, tag: &text::Identifier, attributes: &event::Attributes) -> bool {
-        (**self).matches(tag, attributes)
+    fn matches(&self, event: &event::Event) -> bool {
+        (**self).matches(event)
     }
 }
 
 impl<'a, T> Selector for &'a T where T: Selector {
     
-    fn matches(&self, tag: &text::Identifier, attributes: &event::Attributes) -> bool {
-        (*self).matches(tag, attributes)
+    fn matches(&self, event: &event::Event) -> bool {
+        (*self).matches(event)
     }
 }
 
+/// Conversion trait for selectors.
+///
+/// This trait is used by `Api::select` and similar methods to construct selectors from
+/// provided values.
 pub trait IntoSelector {
 
+    /// The kind of error that is returned when a conversion fails.
     type Error: Into<event::StreamError>;
+
+    /// The kind of selector that is returned on success.
     type Selector: Selector;
 
+    /// Convert the value into a selector.
     fn into_selector(self) -> Result<Self::Selector, Self::Error>;
 }
 
@@ -53,9 +72,12 @@ where
     fn into_selector(self) -> Result<S, E> { self }
 }
 
+/// Id construction error.
 #[derive(Debug)]
 pub enum IdError {
+    /// The ID identifier was invalid.
     Identifier {
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
 }
@@ -92,6 +114,44 @@ impl From<IdError> for event::StreamError {
     }
 }
 
+/// Select all elements with a specific ID.
+///
+/// # Examples
+///
+/// ```
+/// # use std::error;
+/// # fn run() -> Result<(), Box<error::Error>> {
+/// use html5_fuser::{ Template, ParseOptions };
+/// use html5_fuser::select::{ Id };
+///
+/// // For the Id construction.
+/// use std::str::{ FromStr };
+///
+/// let template = Template::from_str(r#"
+///     <a id="home-link">Home</a>
+///     <a id="contact-link">Contact</a>
+/// "#, ParseOptions::default())?;
+///
+/// let home_id = Id::from_str("home-link")?;
+///
+/// let output = format!("{}", template.transform(|html| html
+///     // Using a preconstructed id selector.
+///     .select(home_id, |html| html
+///         .set_attribute("href", "index.html")
+///     )
+///     // Using a id selector construction result.
+///     // A selector error like an invalid identifier
+///     // will emit a stream error.
+///     .select(Id::from_str("contact-link"), |html| html
+///         .set_attribute("href", "contact.html")
+///     )
+/// )?);
+///
+/// assert!(output.contains(r#"id="home-link" href="index.html""#));
+/// assert!(output.contains(r#"id="contact-link" href="contact.html""#));
+/// # Ok(()) }
+/// # fn main() { run().unwrap() }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Id {
     identifier: text::Identifier,
@@ -110,14 +170,21 @@ impl str::FromStr for Id {
 
 impl Selector for Id {
 
-    fn matches(&self, _tag: &text::Identifier, attributes: &event::Attributes) -> bool {
-        attributes.has_id(&self.identifier)
+    fn matches(&self, event: &event::Event) -> bool {
+        if let Some(attributes) = event.attributes() {
+            attributes.has_id(&self.identifier)
+        } else {
+            false
+        }
     }
 }
 
+/// Tag construction error.
 #[derive(Debug)]
 pub enum TagError {
+    /// The tag selector had an invalid identifier.
     Identifier {
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
 }
@@ -154,6 +221,48 @@ impl From<TagError> for event::StreamError {
     }
 }
 
+/// Select all elements with a specific tag name.
+///
+/// # Examples
+///
+/// ```
+/// # use std::error;
+/// # fn run() -> Result<(), Box<error::Error>> {
+/// use html5_fuser::{ Template, ParseOptions };
+/// use html5_fuser::select::{ Tag };
+///
+/// // For the Tag construction.
+/// use std::str::{ FromStr };
+///
+/// let template = Template::from_str(r#"
+///     <html>
+///         <head>
+///             <title></title>
+///         </head>
+///         <body/>
+///     </html>
+/// "#, ParseOptions::default())?;
+///
+/// let title_tag = Tag::from_str("title")?;
+///
+/// let output = format!("{}", template.transform(|html| html
+///     // Using a preconstructed tag name selector.
+///     .select(title_tag, |html| html
+///         .replace_contents("New Title")
+///     )
+///     // Using a tag name selector construction result.
+///     // A selector error like an invalid identifier
+///     // will emit a stream error.
+///     .select(Tag::from_str("body"), |html| html
+///         .replace_contents("Content")
+///     )
+/// )?);
+///
+/// assert!(output.contains(r#"<title>New Title</title>"#));
+/// assert!(output.contains(r#"<body>Content</body>"#));
+/// # Ok(()) }
+/// # fn main() { run().unwrap() }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tag {
     identifier: text::Identifier,
@@ -172,14 +281,21 @@ impl str::FromStr for Tag {
 
 impl Selector for Tag {
 
-    fn matches(&self, tag: &text::Identifier, _attributes: &event::Attributes) -> bool {
-        *tag == self.identifier
+    fn matches(&self, event: &event::Event) -> bool {
+        if let Some(tag) = event.element_tag_start() {
+            *tag == self.identifier
+        } else {
+            false
+        }
     }
 }
 
+/// Class construction error.
 #[derive(Debug)]
 pub enum ClassError {
+    /// The class identifier was invalid.
     Identifier {
+        /// Reason for identifier invalidity.
         error: text::IdentifierError,
     },
 }
@@ -216,6 +332,44 @@ impl From<ClassError> for event::StreamError {
     }
 }
 
+/// Select all elements with a specific class.
+///
+/// # Examples
+///
+/// ```
+/// # use std::error;
+/// # fn run() -> Result<(), Box<error::Error>> {
+/// use html5_fuser::{ Template, ParseOptions };
+/// use html5_fuser::select::{ Class };
+///
+/// // For the Class construction.
+/// use std::str::{ FromStr };
+///
+/// let template = Template::from_str(r#"
+///     <a class="home-link">Home</a>
+///     <a class="contact-link">Contact</a>
+/// "#, ParseOptions::default())?;
+///
+/// let home_class = Class::from_str("home-link")?;
+///
+/// let output = format!("{}", template.transform(|html| html
+///     // Using a preconstructed class selector.
+///     .select(home_class, |html| html
+///         .set_attribute("href", "index.html")
+///     )
+///     // Using a class selector construction result.
+///     // A selector error like an invalid identifier
+///     // will emit a stream error.
+///     .select(Class::from_str("contact-link"), |html| html
+///         .set_attribute("href", "contact.html")
+///     )
+/// )?);
+///
+/// assert!(output.contains(r#"class="home-link" href="index.html""#));
+/// assert!(output.contains(r#"class="contact-link" href="contact.html""#));
+/// # Ok(()) }
+/// # fn main() { run().unwrap() }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Class {
     identifier: text::Identifier,
@@ -234,16 +388,25 @@ impl str::FromStr for Class {
 
 impl Selector for Class {
 
-    fn matches(&self, _tag: &text::Identifier, attributes: &event::Attributes) -> bool {
-        attributes.has_class(&self.identifier)
+    fn matches(&self, event: &event::Event) -> bool {
+        if let Some(attributes) = event.attributes() {
+            attributes.has_class(&self.identifier)
+        } else {
+            false
+        }
     }
 }
 
+/// Classes construction error.
 #[derive(Debug)]
 pub enum ClassesError {
+    /// The class list was empty, making the selector unrestricted.
     Empty,
+    /// One of the class names was not a valid identifier.
     Identifier {
+        /// Index of the invalid identifier.
         index: usize,
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
 }
@@ -281,6 +444,55 @@ impl From<ClassesError> for event::StreamError {
     }
 }
 
+/// Select all elements having all the specified classes.
+///
+/// # Examples
+///
+/// ```
+/// # use std::error;
+/// # fn run() -> Result<(), Box<error::Error>> {
+/// use html5_fuser::{ Template, ParseOptions };
+/// use html5_fuser::select::{ Classes };
+///
+/// // For the Classes construction.
+/// use std::str::{ FromStr };
+///
+/// let template = Template::from_str(r#"
+///     <a class="home navlink">Home</a>
+///     <a class="contact navlink">Contact</a>
+/// "#, ParseOptions::default())?;
+///
+/// let home_classes = Classes::from_str_iterator(
+///     "home navlink".split_whitespace(),
+/// )?;
+///
+/// let output = format!("{}", template.transform(|html| html
+///     // Using a preconstructed classes selector.
+///     .select(home_classes, |html| html
+///         .set_attribute("href", "index.html")
+///     )
+///     // Using a classes selector construction result.
+///     // A selector error like an invalid identifier
+///     // will emit a stream error.
+///     .select(
+///         Classes::from_str_iterator(
+///             "navlink contact".split_whitespace()
+///         ),
+///         |html| html.set_attribute("href", "contact.html"),
+///     )
+/// )?);
+///
+/// assert!(
+///     output
+///     .contains(r#"class="home navlink" href="index.html""#)
+/// );
+/// assert!(
+///     output
+///     .contains(r#"class="contact navlink" href="contact.html""#)
+/// );
+/// # Ok(()) }
+/// # fn main() { run().unwrap() }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Classes {
     identifiers: Vec<text::Identifier>,
@@ -288,6 +500,7 @@ pub struct Classes {
 
 impl Classes {
 
+    /// Construct an instance from an iterator of `&str`s.
     pub fn from_str_iterator<'i, I>(iter: I) -> Result<Classes, ClassesError>
     where I: Iterator<Item=&'i str>
     {
@@ -307,27 +520,40 @@ impl Classes {
 
 impl Selector for Classes {
 
-    fn matches(&self, _tag: &text::Identifier, attributes: &event::Attributes) -> bool {
-        for identifier in &self.identifiers {
-            if !attributes.has_class(identifier) {
-                return false;
+    fn matches(&self, event: &event::Event) -> bool {
+        if let Some(attributes) = event.attributes() {
+            for identifier in &self.identifiers {
+                if !attributes.has_class(identifier) {
+                    return false;
+                }
             }
+            true
+        } else {
+            false
         }
-        true
     }
 }
 
+/// Static selector errors.
 #[derive(Debug)]
 pub enum StaticError {
+    /// The selector was unrestricted.
     Unrestricted,
+    /// The tag name selector had an invalid identifier.
     Tag {
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
+    /// The id selector had an invalid identifier.
     Id {
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
+    /// A class selector had an invalid identifier.
     Class {
+        /// Index of the invalid class.
         index: usize,
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
 }
@@ -371,6 +597,56 @@ impl From<StaticError> for event::StreamError {
     }
 }
 
+/// A selector based on a `&'static str` specification.
+///
+/// This is a convenience selector that allows specifying the tag name, ID and classes
+/// for the selector in a single `&'static str`. The value has the following parts, in
+/// order:
+///
+/// * An optional bare identifier for the tag name. For example: `body`.
+/// * An optional `#` prefixed identifier for the ID. For example: `#page-title`.
+/// * Zero or more `.` prefixed identifiers for required classes. For example: `.navlink`.
+///
+/// Empty and thus unrestricted selectors are invalid. At least one of the above parts has
+/// to be included.
+///
+/// The parts are put right after each other. So `a#home.link.active` would match any `a`
+/// element with a `home` ID and both `link` and `active` classes.
+///
+/// # Examples
+///
+/// ```
+/// # use std::error;
+/// # fn run() -> Result<(), Box<error::Error>> {
+/// use html5_fuser::{ Template, ParseOptions };
+///
+/// let template = Template::from_str(r#"
+///     <html>
+///         <head><title>Title</title></head>
+///         <body>
+///             <div id="message">
+///                 Hello
+///                 <span class="current-user">Current User</span>!
+///             </div>
+///         </body>
+///     </html>
+/// "#, ParseOptions::default())?;
+///
+/// let output = format!("{}", template.transform(|html| html
+///     .select("title", |html| html.replace_contents("Welcome Page"))
+///     .select("#message", |html| html
+///         .subselect(".current-user", |html| html
+///             .replace_contents("Foo")
+///         )
+///     )
+/// )?);
+///
+/// assert!(output.contains(r#"<title>Welcome Page</title>"#));
+/// assert!(output.contains(r#"<span class="current-user">Foo</span>"#));
+///
+/// # Ok(()) }
+/// # fn main() { run().unwrap() }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Static {
     tag: Option<&'static str>,
@@ -380,7 +656,11 @@ pub struct Static {
 
 impl Selector for Static {
 
-    fn matches(&self, tag: &text::Identifier, attributes: &event::Attributes) -> bool {
+    fn matches(&self, event: &event::Event) -> bool {
+        let (tag, attributes) = match (event.element_tag_start(), event.attributes()) {
+            (Some(tag), Some(attributes)) => (tag, attributes),
+            _ => return false,
+        };
         if let Some(match_tag) = self.tag {
             if !tag.is_eq(match_tag) {
                 return false;
@@ -458,18 +738,29 @@ impl IntoSelector for &'static str {
     }
 }
 
+/// Error used in event stream emission.
+///
+/// Static selector errors are emitted via `StaticError` instead.
 #[derive(Debug)]
 pub enum Error {
+    /// A tag name selector had an invalid identifier.
     Tag {
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
+    /// A ID selector had an invalid identifier.
     Id {
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
+    /// A class selector had an invalid identifier.
     Class {
+        /// Reason for the identifier invalidity.
         error: text::IdentifierError,
     },
+    /// A multiple classes selector was invalid.
     Classes {
+        /// Reason for the selector invalidity.
         error: ClassesError,
     },
 }

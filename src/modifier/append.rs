@@ -1,9 +1,12 @@
 
+//! Append another stream.
+
 use event;
 use modifier;
 use transform;
 use builder;
 
+/// Appends another stream after the current.
 #[derive(Debug)]
 pub struct Append<S, N> {
     stream: modifier::Combine<S, N>,
@@ -31,6 +34,7 @@ where
     }
 }
 
+/// Appends another stream to the contents of the current element.
 pub struct AppendContent<S, N>
 where
     S: event::ElementStream,

@@ -1,4 +1,10 @@
 
+//! Transformations.
+//!
+//! This module contains the actual stream transformation functionality. You should not have
+//! to interact with any of these directly. They are expected to be constructed via the
+//! toplevel `Api` type.
+
 use std::marker;
 
 use event;
@@ -35,7 +41,7 @@ impl Level {
             Ok(Level { depth: self.depth + 1 })
         } else if let Some(name) = event.closing_tag_name() {
             if self.depth == 0 {
-                return Err(event::StreamError::unexpected_close(name.to_string()));
+                return Err(event::StreamError::unexpected_close(name.clone()));
             }
             Ok(Level { depth: self.depth - 1 })
         } else {
@@ -96,6 +102,10 @@ enum FallibleState<S> {
     }
 }
 
+/// A stream that can be set to emit an error.
+///
+/// This is usually used when fallible type conversions are required during transform
+/// construction.
 #[derive(Debug)]
 pub struct Fallible<S> {
     state: State<FallibleState<S>>,
@@ -147,17 +157,17 @@ impl<S> event::Stream for Expand<S> where S: event::Stream {
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| match state {
             ExpandState::Start { mut stream } => match stream.next_event_skip_noop()? {
-                Some(event::Event::OpeningTag { tag, attributes }) =>
+                Some(event::Event(event::EventKind::OpeningTag { tag, attributes })) =>
                     Ok(Some((
                         event::open(tag, attributes),
                         Some(ExpandState::EmitStream { stream }),
                     ))),
-                Some(event::Event::SelfClosedTag { tag, attributes }) =>
+                Some(event::Event(event::EventKind::SelfClosedTag { tag, attributes })) =>
                     Ok(Some((
                         event::open(tag.clone(), attributes),
                         Some(ExpandState::EmitClosingTag { tag }),
                     ))),
-                Some(event::Event::VoidTag { tag, attributes }) =>
+                Some(event::Event(event::EventKind::VoidTag { tag, attributes })) =>
                     Ok(Some((event::void(tag, attributes), None))),
                 other => Err(event::StreamError::expected_open(other)),
             },
@@ -262,6 +272,7 @@ enum CombineState<S1, S2> {
     Second(S2),
 }
 
+/// Implement `ElementStream` for `S` only when `D` implements it.
 pub struct Derived<S, D> {
     stream: S,
     _derived_from: marker::PhantomData<D>,
@@ -304,16 +315,16 @@ mod tests {
         let mut events = ::event::test_collect(expand).unwrap();
         assert_eq!(
             events.pop(),
-            Some(::event::Event::ClosingTag {
+            Some(::event::Event(::event::EventKind::ClosingTag {
                 tag: "b".parse().unwrap(),
-            })
+            }))
         );
         assert_eq!(
             events.pop(),
-            Some(::event::Event::OpeningTag {
+            Some(::event::Event(::event::EventKind::OpeningTag {
                 tag: "b".parse().unwrap(),
                 attributes: ::event::Attributes::new(Vec::new()),
-            })
+            }))
         );
         assert_eq!(
             events.pop(),

@@ -3,6 +3,7 @@ use event;
 use text;
 use modifier;
 
+/// A stream representing a single element.
 #[derive(Debug)]
 pub struct SingleElement<S> {
     state: modifier::State<SingleElementState<S>>,
@@ -24,13 +25,13 @@ impl<S> event::Stream for SingleElement<S> where S: event::Stream {
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| match state {
             SingleElementState::Start { event, stream } => match event {
-                event::Event::OpeningTag { tag, attributes } => Ok(Some((
+                event::Event(event::EventKind::OpeningTag { tag, attributes }) => Ok(Some((
                     event::open(tag.clone(), attributes),
                     Some(SingleElementState::EmitUntilClose { tag, stream, level: 0 }),
                 ))),
-                event::Event::SelfClosedTag { tag, attributes } =>
+                event::Event(event::EventKind::SelfClosedTag { tag, attributes }) =>
                     Ok(Some((event::self_closed(tag, attributes), None))),
-                event::Event::VoidTag { tag, attributes } =>
+                event::Event(event::EventKind::VoidTag { tag, attributes }) =>
                     Ok(Some((event::void(tag, attributes), None))),
                 other => Err(event::StreamError::expected_open(Some(other))),
             },

@@ -12,6 +12,7 @@ use super::{ Shared };
 
 type SharedPeek<S> = Shared<modifier::Peek<modifier::Expand<S>>>;
 
+/// Select an elements contents.
 pub struct SelectContent<S, B>
 where
     S: event::ElementStream,
@@ -52,11 +53,9 @@ where
                     None => return Err(event::StreamError::expected_open(None)),
                 };
                 let tag = match event {
-                    event::Event::OpeningTag { ref tag, .. } => tag.clone(),
-                    event::Event::VoidTag { tag, attributes } => return Ok(Some((
-                        event::void(tag, attributes),
-                        None,
-                    ))),
+                    event::Event(event::EventKind::OpeningTag { ref tag, .. }) => tag.clone(),
+                    event::Event(event::EventKind::VoidTag { tag, attributes }) =>
+                        return Ok(Some((event::void(tag, attributes), None))),
                     other => return Err(event::StreamError::expected_open(Some(other))),
                 };
                 let source = rc::Rc::new(cell::RefCell::new(
@@ -81,15 +80,17 @@ where
                 },
             SelectContentState::Close { mut source, tag } => {
                 let event = match source.next_event_skip_noop()? {
-                    Some(event::Event::ClosingTag { tag: closed_tag }) =>
+                    Some(event::Event(event::EventKind::ClosingTag { tag: closed_tag })) =>
                         if closed_tag == tag {
                             event::close(closed_tag)
                         } else {
                             return Err(
-                                event::StreamError::unexpected_close(closed_tag.to_string())
+                                event::StreamError::unexpected_close(closed_tag)
                             );
                         },
-                    other => return Err(event::StreamError::expected_close(other)),
+                    other => return Err(
+                        event::StreamError::expected_close(other, tag),
+                    ),
                 };
                 Ok(Some((event, None)))
             },
@@ -117,6 +118,7 @@ where
     },
 }
 
+/// Stream containing the contents of the current element.
 pub struct CurrentContent<S> {
     state: modifier::State<CurrentContentState<S>>,
 }
@@ -144,7 +146,7 @@ fn has_reached_end<S: event::Stream>(
     }
     match stream.borrow_mut().peek(|event| event.is_closing_tag_for(tag))? {
         Some(value) => Ok(value),
-        None => Err(event::StreamError::missing_close(tag.to_string())),
+        None => Err(event::StreamError::missing_close(tag.clone())),
     }
 }
 
@@ -157,10 +159,10 @@ impl<S> event::Stream for CurrentContent<S> where S: event::Stream {
             }
             let event = match stream.next_event()? {
                 Some(event) => event,
-                None => return Err(event::StreamError::missing_close(tag.to_string())),
+                None => return Err(event::StreamError::missing_close(tag)),
             };
             let level = level.adjust(&event)
-                .map_err(|_| event::StreamError::missing_close(tag.to_string()))?;
+                .map_err(|_| event::StreamError::missing_close(tag.clone()))?;
             Ok(Some((event, Some(CurrentContentState { tag, level, stream }))))
         })
     }

@@ -1,8 +1,12 @@
 
+//! Apply various kinds of transformations mid-stream.
+
 use event;
 use template;
 use modifier;
 
+/// A stream that can output either one of two kinds of streams depending on an
+/// externally supplied criteria.
 #[derive(Debug)]
 pub struct ApplyEither<S1, S2> {
     stream: OneOf<S1, S2>
@@ -48,6 +52,7 @@ enum OneOf<S1, S2> {
     Second(S2),
 }
 
+/// A stream transformation with intermediate template storage.
 #[derive(Debug)]
 pub struct TemplateApply<S, B> {
     state: modifier::State<TemplateState<S, B>>,

@@ -1,9 +1,12 @@
 
+//! Replace a stream with another one.
+
 use event;
 use modifier;
 use transform;
 use builder;
 
+/// Emit a different stream instead of the current one.
 pub struct Replace<S, N> {
     stream: modifier::prepend::Prepend<modifier::remove::Remove<S>, N>,
 }
@@ -33,6 +36,7 @@ where
     }
 }
 
+/// Emit a different stream for the contents of the current element.
 pub struct ReplaceContent<S, N>
 where
     S: event::ElementStream,

@@ -7,12 +7,39 @@ use event;
 use text;
 use modifier;
 
+impl event::IntoStream for text::Value {
+
+    type Stream = Stream;
+
+    fn into_stream(self) -> Self::Stream {
+        Stream { data: Some(self.into()) }
+    }
+}
+
+impl<'a> event::IntoStream for &'a text::Value {
+
+    type Stream = Stream;
+
+    fn into_stream(self) -> Self::Stream {
+        Stream { data: Some(self.clone().into()) }
+    }
+}
+
 impl event::IntoStream for text::Data {
 
     type Stream = Stream;
 
     fn into_stream(self) -> Self::Stream {
         Stream { data: Some(self) }
+    }
+}
+
+impl<'a> event::IntoStream for &'a text::Data {
+
+    type Stream = Stream;
+
+    fn into_stream(self) -> Self::Stream {
+        Stream { data: Some(self.clone()) }
     }
 }
 
@@ -63,7 +90,7 @@ macro_rules! impl_octal {
             fn into_stream(self) -> Self::Stream {
                 use std::fmt::{ Write };
                 let mut tendril = tendril::StrTendril::new();
-                write!(tendril, "{:o}", self).expect("writing octal to template");
+                write!(tendril, "{}", self).expect("writing octal to template");
                 Stream { data: Some(text::Data::from_encoded_tendril(tendril)) }
             }
         }

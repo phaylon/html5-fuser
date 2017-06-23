@@ -1,24 +1,28 @@
 
+//! Repeat a stream multiple times.
+
 use event;
 use modifier;
 use transform;
 use template;
 use builder;
 
-pub type ElementTemplate<D> = modifier::Derived<template::TemplateStream, D>;
+/// A stored stream representing an element if the parent stream does.
+pub type MaybeElementTemplate<D> = modifier::Derived<template::TemplateStream, D>;
 
+/// Repeat a stream for each item of an iterator.
 pub struct Repeat<S, I, B>
 where
     I: Iterator,
-    B: builder::BuildMutMapped<ElementTemplate<S>, I::Item>,
+    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
 {
-    state: modifier::State<State<S, I, B, ElementTemplate<S>>>,
+    state: modifier::State<State<S, I, B, MaybeElementTemplate<S>>>,
 }
 
 impl<S, I, B> Repeat<S, I, B>
 where
     I: Iterator,
-    B: builder::BuildMutMapped<ElementTemplate<S>, I::Item>,
+    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
 {
     pub(crate) fn new(stream: S, iter: I, builder: B) -> Repeat<S, I, B> {
         Repeat {
@@ -31,7 +35,7 @@ impl<S, I, B> event::Stream for Repeat<S, I, B>
 where
     S: event::Stream,
     I: Iterator,
-    B: builder::BuildMutMapped<ElementTemplate<S>, I::Item>,
+    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
 {
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| state.step(modifier::Derived::new))
@@ -145,6 +149,7 @@ where
     }
 }
 
+/// Repeat the contents of the current element for each item of an iterator.
 pub struct RepeatContent<S, I, B>
 where
     S: event::ElementStream,

@@ -40,7 +40,7 @@ fn encode_str_optional(mut input: &str) -> Option<tendril::StrTendril> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EncodedText {
+pub(crate) struct EncodedText {
     value: text::Deferred<tendril::StrTendril>,
 }
 
@@ -125,6 +125,10 @@ impl From<text::Text> for EncodedText {
     }
 }
 
+/// An encoded string slice.
+///
+/// This is used instead of a `&str` slice to have a slight barrier against accidental
+/// double-encoding.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct EncodedStr<'a> {
     content: &'a str,

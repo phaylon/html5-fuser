@@ -8,6 +8,7 @@ use super::{
     SelectAny, BuildSubElementStream, SelectContent, CurrentContent,
 };
 
+/// Select a substream at any level in the current elements children.
 pub struct SubSelectAny<S, M, B>
 where
     S: event::ElementStream,

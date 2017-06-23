@@ -1,4 +1,6 @@
 
+//! Element attribute transformations.
+
 use text;
 use modifier;
 use event;
@@ -21,14 +23,14 @@ where
 {
     match state {
         State::Start { mut stream, data } => match stream.next_event_skip_noop()? {
-            Some(event::Event::OpeningTag { tag, attributes }) =>
+            Some(event::Event(event::EventKind::OpeningTag { tag, attributes })) =>
                 Ok(Some((
                     event::open(tag, modify(attributes, data)),
                     Some(State::Emit { stream }),
                 ))),
-            Some(event::Event::SelfClosedTag { tag, attributes }) =>
+            Some(event::Event(event::EventKind::SelfClosedTag { tag, attributes })) =>
                 Ok(Some((event::self_closed(tag, modify(attributes, data)), None))),
-            Some(event::Event::VoidTag { tag, attributes }) =>
+            Some(event::Event(event::EventKind::VoidTag { tag, attributes })) =>
                 Ok(Some((event::void(tag, modify(attributes, data)), None))),
             other => Err(event::StreamError::expected_open(other)),
         },
@@ -36,12 +38,15 @@ where
     }
 }
 
+/// Remove all `class` attributes.
 #[derive(Debug)]
 pub struct RemoveClass<S> {
     state: modifier::State<State<S, text::Identifier>>,
 }
 
-impl<S> event::Stream for RemoveClass<S> where S: event::Stream {
+impl<S> event::ElementStream for RemoveClass<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for RemoveClass<S> where S: event::ElementStream {
 
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| attribute_step(state, |attributes, name|
@@ -50,7 +55,7 @@ impl<S> event::Stream for RemoveClass<S> where S: event::Stream {
     }
 }
 
-impl<S> RemoveClass<S> where S: event::Stream {
+impl<S> RemoveClass<S> where S: event::ElementStream {
 
     pub(crate) fn new(stream: S, name: text::Identifier)
     -> RemoveClass<S> {
@@ -63,12 +68,15 @@ impl<S> RemoveClass<S> where S: event::Stream {
     }
 }
 
+/// Remove an attribute.
 #[derive(Debug)]
 pub struct RemoveAttribute<S> {
     state: modifier::State<State<S, text::Identifier>>,
 }
 
-impl<S> event::Stream for RemoveAttribute<S> where S: event::Stream {
+impl<S> event::ElementStream for RemoveAttribute<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for RemoveAttribute<S> where S: event::ElementStream {
 
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| attribute_step(state, |attributes, name|
@@ -77,7 +85,7 @@ impl<S> event::Stream for RemoveAttribute<S> where S: event::Stream {
     }
 }
 
-impl<S> RemoveAttribute<S> where S: event::Stream {
+impl<S> RemoveAttribute<S> where S: event::ElementStream {
 
     pub(crate) fn new(stream: S, name: text::Identifier)
     -> RemoveAttribute<S> {
@@ -90,12 +98,15 @@ impl<S> RemoveAttribute<S> where S: event::Stream {
     }
 }
 
+/// Add an attribute to an element.
 #[derive(Debug)]
 pub struct AddAttribute<S> {
     state: modifier::State<State<S, (text::Identifier, Option<text::Value>)>>,
 }
 
-impl<S> event::Stream for AddAttribute<S> where S: event::Stream {
+impl<S> event::ElementStream for AddAttribute<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for AddAttribute<S> where S: event::ElementStream {
 
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| attribute_step(state, |attributes, (name, value)|
@@ -104,7 +115,7 @@ impl<S> event::Stream for AddAttribute<S> where S: event::Stream {
     }
 }
 
-impl<S> AddAttribute<S> where S: event::Stream {
+impl<S> AddAttribute<S> where S: event::ElementStream {
 
     pub(crate) fn new(stream: S, name: text::Identifier, value: Option<text::Value>)
     -> AddAttribute<S> {
@@ -117,12 +128,15 @@ impl<S> AddAttribute<S> where S: event::Stream {
     }
 }
 
+/// Replace an attribute with a new value.
 #[derive(Debug)]
 pub struct ReplaceAttribute<S> {
     state: modifier::State<State<S, (text::Identifier, Option<text::Value>)>>,
 }
 
-impl<S> event::Stream for ReplaceAttribute<S> where S: event::Stream {
+impl<S> event::ElementStream for ReplaceAttribute<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for ReplaceAttribute<S> where S: event::ElementStream {
 
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| attribute_step(state, |attributes, (name, value)|
@@ -131,7 +145,7 @@ impl<S> event::Stream for ReplaceAttribute<S> where S: event::Stream {
     }
 }
 
-impl<S> ReplaceAttribute<S> where S: event::Stream {
+impl<S> ReplaceAttribute<S> where S: event::ElementStream {
 
     pub(crate) fn new(stream: S, name: text::Identifier, value: Option<text::Value>)
     -> ReplaceAttribute<S> {
@@ -144,12 +158,15 @@ impl<S> ReplaceAttribute<S> where S: event::Stream {
     }
 }
 
+/// Add a value to an attribute.
 #[derive(Debug)]
 pub struct AddToAttribute<S> {
     state: modifier::State<State<S, (text::Identifier, text::Value, text::Value)>>,
 }
 
-impl<S> event::Stream for AddToAttribute<S> where S: event::Stream {
+impl<S> event::ElementStream for AddToAttribute<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for AddToAttribute<S> where S: event::ElementStream {
 
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| attribute_step(state, |attributes, (name, value, separator)|
@@ -158,7 +175,7 @@ impl<S> event::Stream for AddToAttribute<S> where S: event::Stream {
     }
 }
 
-impl<S> AddToAttribute<S> where S: event::Stream {
+impl<S> AddToAttribute<S> where S: event::ElementStream {
 
     pub(crate) fn new(
         stream: S,
@@ -175,12 +192,15 @@ impl<S> AddToAttribute<S> where S: event::Stream {
     }
 }
 
+/// Set an attribute value.
 #[derive(Debug)]
 pub struct SetAttribute<S> {
     state: modifier::State<State<S, (text::Identifier, Option<text::Value>)>>,
 }
 
-impl<S> event::Stream for SetAttribute<S> where S: event::Stream {
+impl<S> event::ElementStream for SetAttribute<S> where S: event::ElementStream {}
+
+impl<S> event::Stream for SetAttribute<S> where S: event::ElementStream {
 
     fn next_event(&mut self) -> event::StreamResult {
         self.state.step(|state| attribute_step(state, |attributes, (name, value)|
@@ -189,7 +209,7 @@ impl<S> event::Stream for SetAttribute<S> where S: event::Stream {
     }
 }
 
-impl<S> SetAttribute<S> where S: event::Stream {
+impl<S> SetAttribute<S> where S: event::ElementStream {
 
     pub(crate) fn new(stream: S, name: text::Identifier, value: Option<text::Value>)
     -> SetAttribute<S> {

@@ -5,6 +5,7 @@ use builder;
 
 use super::{ Select, BuildElementStream, DirectOnly };
 
+/// Select a substream at the toplevel only.
 pub struct SelectDirect<S, M, B>
 where
     B: builder::BuildMut<BuildElementStream<S>>,
@@ -35,13 +36,3 @@ where
         self.select.next_event()
     }
 }
-
-impl<S, M, B> event::ElementStream for SelectDirect<S, M, B>
-where
-    M: select::Selector,
-    S: event::Stream,
-    B: builder::BuildMut<BuildElementStream<S>>,
-    B::Stream: event::ElementStream,
-{}
-
-

@@ -1,4 +1,6 @@
 
+//! Parsing location tracking.
+
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -8,6 +10,9 @@ pub(crate) struct Located<T> {
 }
 
 /// A source location.
+///
+/// Used to communicate locations of parsing errors. Once the parsing is completed and
+/// streams are transformed, locations are no longer available.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Location {
     line: usize,

@@ -1,9 +1,12 @@
 
+//! Consume and drop all stream events.
+
 use event;
 use modifier;
 use transform;
 use builder;
 
+/// Removes all items in a stream.
 #[derive(Debug)]
 pub struct Remove<S> {
     stream: S,
@@ -24,6 +27,7 @@ impl<S> event::Stream for Remove<S> where S: event::Stream {
     }
 }
 
+/// Removes all contents of the current element.
 pub struct RemoveContent<S> where S: event::ElementStream {
     stream: modifier::select::SelectContent<S, Builder>,
 }

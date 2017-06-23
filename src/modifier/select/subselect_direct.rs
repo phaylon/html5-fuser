@@ -8,6 +8,7 @@ use super::{
     SelectDirect, BuildSubElementStream, SelectContent, CurrentContent,
 };
 
+/// Select a substream on the toplevel of the elements children only.
 pub struct SubSelectDirect<S, M, B>
 where
     S: event::ElementStream,

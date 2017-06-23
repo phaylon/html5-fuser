@@ -5,6 +5,7 @@ use builder;
 
 use super::{ Select, BuildElementStream, NoRestriction };
 
+/// Select a substream at any level.
 pub struct SelectAny<S, M, B>
 where
     B: builder::BuildMut<BuildElementStream<S>>,
@@ -35,12 +36,3 @@ where
         self.select.next_event()
     }
 }
-
-impl<S, M, B> event::ElementStream for SelectAny<S, M, B>
-where
-    M: select::Selector,
-    S: event::Stream,
-    B: builder::BuildMut<BuildElementStream<S>>,
-    B::Stream: event::ElementStream,
-{}
-

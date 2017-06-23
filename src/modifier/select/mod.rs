@@ -1,4 +1,6 @@
 
+//! Apply transforms only to specific parts of a stream.
+
 use std::rc;
 use std::cell;
 
@@ -106,7 +108,8 @@ where
                     Some(event) => event,
                     None => return Ok(None),
                 };
-                if restriction.include(&level) && matches_event(matcher, &event) {
+                //if restriction.include(&level) && matches_event(matcher, &event) {
+                if restriction.include(&level) && matcher.matches(&event) {
                     let element = SingleElement::new(source.clone(), event);
                     let new_stream = transform::build_mut(element, builder);
                     let state = SelectState::Active { stream: new_stream, level };
@@ -122,17 +125,6 @@ where
                 Some(event) => Ok(Some((event, Some(SelectState::Active { stream, level })))),
             },
         })
-    }
-}
-
-fn matches_event<M>(selector: &M, event: &event::Event) -> bool
-where M: select::Selector {
-    match *event {
-        event::Event::OpeningTag { ref tag, ref attributes, .. }
-        | event::Event::SelfClosedTag { ref tag, ref attributes, .. }
-        | event::Event::VoidTag { ref tag, ref attributes, .. } =>
-            selector.matches(tag, attributes),
-        _ => false,
     }
 }
 

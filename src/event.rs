@@ -15,8 +15,12 @@ use text;
 use template;
 use select;
 
+/// A processable event.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Event {
+pub struct Event(pub(crate) EventKind);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum EventKind {
     Noop,
     Doctype {
         content: text::EncodedText,
@@ -49,17 +53,36 @@ pub enum Event {
 
 impl Event {
 
-    pub(crate) fn description(&self) -> &'static str {
-        match *self {
-            Event::Noop => "noop",
-            Event::Doctype { .. } => "doctype",
-            Event::Comment { .. } => "comment",
-            Event::Data { .. } => "content",
-            Event::RawData { .. } => "raw content",
-            Event::OpeningTag { .. } => "opening tag",
-            Event::ClosingTag { .. } => "closing tag",
-            Event::SelfClosedTag { .. } => "self-closed tag",
-            Event::VoidTag { .. } => "void tag",
+    pub(crate) fn element_tag_start(&self) -> Option<&text::Identifier> {
+        match self.0 {
+            EventKind::OpeningTag { ref tag, .. } => Some(tag),
+            EventKind::SelfClosedTag { ref tag, .. } => Some(tag),
+            EventKind::VoidTag { ref tag, .. } => Some(tag),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn attributes(&self) -> Option<&Attributes> {
+        match self.0 {
+            EventKind::OpeningTag { ref attributes, .. } => Some(attributes),
+            EventKind::SelfClosedTag { ref attributes, .. } => Some(attributes),
+            EventKind::VoidTag { ref attributes, .. } => Some(attributes),
+            _ => None,
+        }
+    }
+
+    /// Static textual description of an event for error reporting.
+    pub fn description(&self) -> &'static str {
+        match self.0 {
+            EventKind::Noop => "noop",
+            EventKind::Doctype { .. } => "doctype",
+            EventKind::Comment { .. } => "comment",
+            EventKind::Data { .. } => "content",
+            EventKind::RawData { .. } => "raw content",
+            EventKind::OpeningTag { .. } => "opening tag",
+            EventKind::ClosingTag { .. } => "closing tag",
+            EventKind::SelfClosedTag { .. } => "self-closed tag",
+            EventKind::VoidTag { .. } => "void tag",
         }
     }
 
@@ -70,87 +93,87 @@ impl Event {
     }
 
     pub(crate) fn is_closing_tag_for_str(&self, tag_name: &str) -> bool {
-        match *self {
-            Event::ClosingTag { ref tag, .. } => tag.is_eq(tag_name),
+        match self.0 {
+            EventKind::ClosingTag { ref tag, .. } => tag.is_eq(tag_name),
             _ => false,
         }
     }
 
     pub(crate) fn is_closing_tag_for(&self, tag_name: &text::Identifier) -> bool {
-        match *self {
-            Event::ClosingTag { ref tag, .. } => *tag == *tag_name,
+        match self.0 {
+            EventKind::ClosingTag { ref tag, .. } => *tag == *tag_name,
             _ => false,
         }
     }
 
     pub(crate) fn closing_tag_name(&self) -> Option<&text::Identifier> {
-        match *self {
-            Event::ClosingTag { ref tag, .. } => Some(tag),
+        match self.0 {
+            EventKind::ClosingTag { ref tag, .. } => Some(tag),
             _ => None,
         }
     }
 
     pub(crate) fn opening_tag_name(&self) -> Option<&text::Identifier> {
-        match *self {
-            Event::OpeningTag { ref tag, .. } => Some(tag),
+        match self.0 {
+            EventKind::OpeningTag { ref tag, .. } => Some(tag),
             _ => None,
         }
     }
 }
 
-pub(crate) fn noop() -> Event { Event::Noop }
+pub(crate) fn noop() -> Event { Event(EventKind::Noop) }
 
 pub(crate) fn void(tag: text::Identifier, attributes: Attributes) -> Event {
-    Event::VoidTag { tag, attributes }
+    Event(EventKind::VoidTag { tag, attributes })
 }
 
 pub(crate) fn open(tag: text::Identifier, attributes: Attributes) -> Event {
-    Event::OpeningTag { tag, attributes }
+    Event(EventKind::OpeningTag { tag, attributes })
 }
 
 pub(crate) fn self_closed(tag: text::Identifier, attributes: Attributes) -> Event {
-    Event::SelfClosedTag { tag, attributes }
+    Event(EventKind::SelfClosedTag { tag, attributes })
 }
 
 pub(crate) fn close(tag: text::Identifier) -> Event {
-    Event::ClosingTag { tag }
+    Event(EventKind::ClosingTag { tag })
 }
 
 pub(crate) fn data(content: text::Data) -> Event {
-    Event::Data { content }
+    Event(EventKind::Data { content })
 }
 
 pub(crate) fn raw_data(content: text::EncodedText) -> Event {
-    Event::RawData { content }
+    Event(EventKind::RawData { content })
 }
 
 pub(crate) fn doctype(content: text::EncodedText) -> Event {
-    Event::Doctype { content }
+    Event(EventKind::Doctype { content })
 }
 
 pub(crate) fn comment(content: text::EncodedText) -> Event {
-    Event::Comment { content }
+    Event(EventKind::Comment { content })
 }
 
 impl fmt::Display for Event {
 
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Event::Noop => Ok(()),
-            Event::Doctype { ref content, .. } =>
+        match self.0 {
+            EventKind::Noop => Ok(()),
+            EventKind::Doctype { ref content, .. } =>
                 write!(fmt, "<!doctype {}>", content),
-            Event::Comment { ref content, .. } =>
+            EventKind::Comment { ref content, .. } =>
                 write!(fmt, "<!--{}-->", content),
-            Event::Data { ref content, .. } =>
+            EventKind::Data { ref content, .. } =>
                 fmt::Display::fmt(content, fmt),
-            Event::RawData { ref content, .. } =>
+            EventKind::RawData { ref content, .. } =>
                 fmt::Display::fmt(content, fmt),
-            Event::SelfClosedTag { ref tag, ref attributes, .. } =>
+            EventKind::SelfClosedTag { ref tag, ref attributes, .. } =>
                 write!(fmt, "<{} />", TagDisplay { tag: tag, attributes: attributes }),
-            Event::OpeningTag { ref tag, ref attributes, .. }
-            | Event::VoidTag { ref tag, ref attributes, .. } =>
+            EventKind::OpeningTag { ref tag, ref attributes, .. }
+            | EventKind::VoidTag { ref tag, ref attributes, .. } =>
                 write!(fmt, "<{}>", TagDisplay { tag: tag, attributes: attributes }),
-            Event::ClosingTag { ref tag, ..} =>
+            EventKind::ClosingTag { ref tag, ..} =>
                 write!(fmt, "</{}>", tag),
         }
     }
@@ -173,9 +196,8 @@ impl<'t, 'a> fmt::Display for TagDisplay<'t, 'a> {
     }
 }
 
-/// A sequence of attributes, in order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Attributes {
+pub(crate) struct Attributes {
     items: rc::Rc<Vec<Attribute>>,
 }
 
@@ -317,9 +339,8 @@ impl fmt::Display for Attributes {
     }
 }
 
-/// A single attribute with an optional value.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Attribute {
+pub(crate) struct Attribute {
     name: text::Identifier,
     value: Option<text::Value>,
 }
@@ -426,6 +447,9 @@ impl fmt::Display for Attribute {
     }
 }
 
+/// Type of result common to all streams.
+///
+/// The end of the stream is signalled via `Ok(None)`.
 pub type StreamResult = Result<Option<Event>, StreamError>;
 
 /// Occurs when an internal invariant wasn't upheld.
@@ -462,24 +486,37 @@ impl error::Error for AssertionError {
     }
 }
 
+/// Occurs when a transformation could not be completed due to an error.
 #[derive(Debug)]
 pub enum StreamError {
+    /// An internal variant was not upheld.
     Assertion {
+        /// Error details.
         error: AssertionError,
     },
+    /// An input error occured, for example by injecting a template result.
     Input {
+        /// Error details.
         error: template::InputError,
     },
+    /// A file error occured, for example by injecting a template result.
     File {
+        /// Error details.
         error: template::FileError,
     },
+    /// An identifier could not be parsed.
     Identifier {
+        /// Error details.
         error: text::IdentifierError,
     },
+    /// An element selector was invalid.
     Selector {
+        /// Error details.
         error: select::Error,
     },
+    /// A static element selector was invalid.
     StaticSelector {
+        /// Error details.
         error: select::StaticError,
     },
 }
@@ -543,52 +580,59 @@ impl From<text::IdentifierError> for StreamError {
 
 impl StreamError {
 
-    pub(crate) fn unexpected_close(tag_name: String) -> StreamError {
+    pub(crate) fn unexpected_close(tag: text::Identifier) -> StreamError {
         StreamError::Assertion {
             error: AssertionError::Malformed {
-                error: MalformedReason::UnexpectedClosingTag { tag_name },
+                error: MalformedReason::UnexpectedClosingTag { tag },
             },
         }
     }
 
-    pub(crate) fn missing_close(tag_name: String) -> StreamError {
+    pub(crate) fn missing_close(tag: text::Identifier) -> StreamError {
+        let event = None;
         StreamError::Assertion {
             error: AssertionError::Malformed {
-                error: MalformedReason::MissingClosingTag { tag_name },
+                error: MalformedReason::ExpectedClosingTag { event, tag },
             },
         }
     }
 
-    pub(crate) fn expected_close(found_event: Option<Event>) -> StreamError {
+    pub(crate) fn expected_close(event: Option<Event>, tag: text::Identifier) -> StreamError {
         StreamError::Assertion {
             error: AssertionError::Malformed {
-                error: MalformedReason::ExpectedClosingTag { found_event },
+                error: MalformedReason::ExpectedClosingTag { event, tag },
             },
         }
     }
 
-    pub(crate) fn expected_open(found_event: Option<Event>) -> StreamError {
+    pub(crate) fn expected_open(event: Option<Event>) -> StreamError {
         StreamError::Assertion {
             error: AssertionError::Malformed {
-                error: MalformedReason::ExpectedOpeningTag { found_event },
+                error: MalformedReason::ExpectedOpeningTag { event },
             },
         }
     }
 }
 
+/// Details about a failed invariant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MalformedReason {
+    /// The stream produced a closing tag that was not expected.
     UnexpectedClosingTag {
-        tag_name: String,
+        /// The name of the unexpected closing tag.
+        tag: text::Identifier,
     },
-    MissingClosingTag {
-        tag_name: String,
-    },
+    /// An opening tag event was expected, but something else was produced.
     ExpectedOpeningTag {
-        found_event: Option<Event>,
+        /// The event that was found instead, or `None` at the end of input.
+        event: Option<Event>,
     },
+    /// A specific closing tag event was expected, but something else was produced.
     ExpectedClosingTag {
-        found_event: Option<Event>,
+        /// The event that was found instead, or `None` at the end of input.
+        event: Option<Event>,
+        /// The name of the expected closing tag.
+        tag: text::Identifier,
     },
 }
 
@@ -596,21 +640,16 @@ impl fmt::Display for MalformedReason {
 
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            MalformedReason::UnexpectedClosingTag { ref tag_name } =>
-                write!(fmt, "Unexpected closing tag for '{}'", tag_name),
-            MalformedReason::MissingClosingTag { ref tag_name } =>
-                write!(fmt, "Missing closing tag for '{}'", tag_name),
-            MalformedReason::ExpectedOpeningTag { ref found_event } =>
+            MalformedReason::UnexpectedClosingTag { ref tag } =>
+                write!(fmt, "Unexpected closing tag for '{}'", tag),
+            MalformedReason::ExpectedOpeningTag { ref event } =>
                 write!(fmt, "Expected opening tag, found {}",
-                     found_event.as_ref()
-                        .map(Event::description)
-                        .unwrap_or("end of input"),
+                     event.as_ref().map(Event::description).unwrap_or("end of input"),
                 ),
-            MalformedReason::ExpectedClosingTag { ref found_event } =>
-                write!(fmt, "Expected closing tag, found {}",
-                     found_event.as_ref()
-                        .map(Event::description)
-                        .unwrap_or("end of input"),
+            MalformedReason::ExpectedClosingTag { ref event, ref tag } =>
+                write!(fmt, "Expected closing tag for {}, found {}",
+                    tag,
+                    event.as_ref().map(Event::description).unwrap_or("end of input"),
                 ),
         }
     }
@@ -631,14 +670,20 @@ where S: Stream {
     Ok(events)
 }
 
+/// Base trait for all stream processing.
+///
+/// This trait is implemented by all transformable streams. You usually don't have access
+/// to these streams and never have to interact with them directly.
 pub trait Stream {
 
+    /// Fetch the next event from the stream.
     fn next_event(&mut self) -> StreamResult;
 
+    /// Like `next_event` but will skip all `Noop` events.
     fn next_event_skip_noop(&mut self) -> StreamResult {
         'events: loop {
             return match self.next_event() {
-                Ok(Some(Event::Noop)) => continue 'events,
+                Ok(Some(Event(EventKind::Noop))) => continue 'events,
                 other => other,
             };
         }
@@ -663,11 +708,20 @@ impl<T> Stream for rc::Rc<cell::RefCell<T>> where T: Stream + ?Sized {
 
 impl<T> ElementStream for rc::Rc<cell::RefCell<T>> where T: ElementStream + ?Sized {}
 
+/// A marker trait for streams producing single full elements.
+///
+/// Streams with this property have additional methods available via the `Api` type.
 pub trait ElementStream: Stream {}
 
+/// Coercion trait for content insertion.
+///
+/// Types which implement this trait can be supplied as content in the relevant `Api`
+/// methods.
 pub trait IntoStream {
 
+    /// The stream that is produced for the type of content.
     type Stream: Stream;
 
+    /// Consumes the value and produces a stream.
     fn into_stream(self) -> Self::Stream;
 }

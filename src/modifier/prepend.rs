@@ -1,9 +1,12 @@
 
+//! Prepend another stream.
+
 use event;
 use modifier;
 use transform;
 use builder;
 
+/// Prepends another stream after the current.
 pub struct Prepend<S, N> {
     stream: modifier::Combine<N, S>,
 }
@@ -30,6 +33,7 @@ where
     }
 }
 
+/// Prepends another stream to the contents of the current element.
 pub struct PrependContent<S, N>
 where
     S: event::ElementStream,

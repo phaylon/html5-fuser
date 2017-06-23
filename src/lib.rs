@@ -84,6 +84,12 @@ pub mod transform;
 pub mod modifier;
 pub mod parse;
 
+pub use event::{
+    Stream,
+    ElementStream,
+    StreamError,
+};
+
 pub use template::{
     Template,
 };

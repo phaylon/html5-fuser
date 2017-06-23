@@ -1,4 +1,6 @@
 
+//! Template handling.
+
 use std::rc;
 use std::str;
 use std::path;
@@ -11,12 +13,17 @@ use event;
 use parse;
 use transform;
 
-#[derive(Debug)]
+/// Invalid input.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputError {
+    /// The input exceeded the configured length limit.
     LengthLimitExceeded {
+        /// The exceeded limit.
         limit: usize,
     },
+    /// The input could not be parsed.
     Parse {
+        /// Actual parse error.
         error: parse::Error,
     },
 }
@@ -45,22 +52,35 @@ impl fmt::Display for InputError {
     }
 }
 
+/// An error occured while reading a HTML5 file.
 #[derive(Debug)]
 pub enum FileError {
+    /// The file could not be opened.
     Open {
+        /// Filename we tried to open.
         path: path::PathBuf,
+        /// Actual open error.
         error: io::Error,
     },
+    /// The file could not be read.
     Read {
+        /// Filename we tried to read.
         path: path::PathBuf,
+        /// Actual read error.
         error: io::Error,
     },
+    /// There was an error with the input.
     Input {
+        /// Filename producing the invalid input.
         path: path::PathBuf,
+        /// Actual input error.
         error: InputError,
     },
+    /// The file content could not be decoded as UTF-8.
     Decode {
+        /// Filename we tried to decode.
         path: path::PathBuf,
+        /// Actual decoding error.
         error: str::Utf8Error,
     },
 }
@@ -92,6 +112,7 @@ impl fmt::Display for FileError {
     }
 }
 
+/// Event stream produced by a template.
 #[derive(Debug)]
 pub struct TemplateStream {
     events: rc::Rc<Vec<event::Event>>,
@@ -111,6 +132,9 @@ impl event::Stream for TemplateStream {
     }
 }
 
+/// A complete HTML5 fragment.
+///
+/// Templates are collected sequences of events that are used as source for transformations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Template {
     events: rc::Rc<Vec<event::Event>>,
@@ -118,6 +142,7 @@ pub struct Template {
 
 impl Template {
 
+    /// Load a template from a file.
     pub fn from_file<P>(path: P, options: parse::Options) -> Result<Template, FileError>
     where P: AsRef<path::Path> {
         use std::io::{ BufRead };
@@ -184,6 +209,7 @@ impl Template {
             })
     }
 
+    /// Load a template from a `&str`.
     pub fn from_str(input: &str, options: parse::Options) -> Result<Template, InputError> {
 
         if let Some(limit) = options.max_input_len {
@@ -222,6 +248,7 @@ impl Template {
         })
     }
 
+    /// Apply a transform to the template. If successful, this produces a new template.
     pub fn transform<B, R>(&self, builder: B) -> Result<Template, event::StreamError>
     where
         B: for<'t> FnOnce(transform::Api<'t, TemplateStream>) -> transform::Api<'t, R>,
