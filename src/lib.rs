@@ -2,12 +2,14 @@
 
 //! A stream based HTML5 templating system with code side logic.
 //!
+//! Everything about this crate is **experimental**.
+//!
 //! This library allows transforming a HTML5 stream with an iterator-like interface. It was
 //! inspired by [`HTML::Zoom`](https://metacpan.org/release/HTML-Zoom).
 //!
 //! Since this library is intended for templating, the HTML5 parser is rather simple and
-//! certainly lacking in some areas. Verification of input and output markup only happens
-//! when necessary for transformations.
+//! certainly lacking in some areas. Verification of input and output markup structure only
+//! happens when necessary for transformations.
 //!
 //! # Templates
 //!
@@ -87,8 +89,8 @@ pub mod parse;
 
 pub use event::{
     Stream,
-    ElementStream,
     StreamError,
+    ElementStream,
 };
 
 pub use template::{
