@@ -101,91 +101,59 @@ enum TemplateState<S, B> {
 mod tests {
     use std::str::{ FromStr };
 
-    #[test]
-    fn apply_as_template() {
-        test_transform!(
-            Default::default(),
+    test_group!(apply_as_template:
+        "with closure" => transform_test!(
             "<a><b>23</b></a>",
             "<a><b>foo</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .apply_as_template(|template| template
-                        .transform(|html| html
-                            .select(::select::Tag::from_str("b").unwrap(), |html| html
-                                .replace_contents("foo")
-                            )
-                        )
-                    )
-                )
-        );
-    }
+            |html| html.select("b", |html| html.apply_as_template(|template| template
+                .transform(|html| html.select("b", |html| html.replace_contents("foo")))
+            )),
+        ),
+    );
 
-    #[test]
-    fn apply() {
-        test_transform!(
-            Default::default(),
+    test_group!(apply:
+        "with closure" => transform_test!(
             "<a><b>23</b></a>",
             "<a><b></b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .apply(|html| html
-                        .remove_contents()
-                    )
-                )
-        );
-    }
+            |html| html.select("b", |html| html.apply(|html| html.remove_contents())),
+        ),
+    );
 
-    #[test]
-    fn apply_if_else() {
-        test_transform!(
-            Default::default(),
+    test_group!(apply_if_else:
+        "true" => transform_test!(
             "<a><b>23</b></a>",
             "<a><b>99</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .apply_if_else(true,
-                        |html| html.replace_contents("99"),
-                        |html| html.replace_contents("33"),
-                    )
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("b", |html| html.apply_if_else(
+                true,
+                |html| html.replace_contents("99"),
+                |html| html.replace_contents("33"),
+            )),
+        ),
+        "false" => transform_test!(
             "<a><b>23</b></a>",
             "<a><b>33</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .apply_if_else(false,
-                        |html| html.replace_contents("99"),
-                        |html| html.replace_contents("33"),
-                    )
-                )
-        );
-    }
+            |html| html.select("b", |html| html.apply_if_else(
+                false,
+                |html| html.replace_contents("99"),
+                |html| html.replace_contents("33"),
+            )),
+        ),
+    );
 
-    #[test]
-    fn apply_if() {
-        test_transform!(
-            Default::default(),
+    test_group!(apply_if:
+        "true" => transform_test!(
             "<a><b>23</b></a>",
             "<a><b>99</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .apply_if(true, |html| html
-                        .replace_contents("99")
-                    )
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("b", |html| html
+                .apply_if(true, |html| html.replace_contents("99"))
+            ),
+        ),
+        "false" => transform_test!(
             "<a><b>23</b></a>",
             "<a><b>23</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .apply_if(false, |html| html
-                        .replace_contents("99")
-                    )
-                )
-        );
-    }
+            |html| html.select("b", |html| html
+                .apply_if(false, |html| html.replace_contents("99"))
+            ),
+        ),
+    );
 }
