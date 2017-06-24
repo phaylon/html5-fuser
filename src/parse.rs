@@ -678,7 +678,7 @@ fn mode_for_tag(tag: &str, self_close: bool) -> Mode {
     Mode::Data
 }
 
-fn is_void_tag(tag: &str) -> bool {
+pub(crate) fn is_void_tag(tag: &str) -> bool {
 
     const VOID_TAGS: &'static [&'static str] = &[
         "area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link",

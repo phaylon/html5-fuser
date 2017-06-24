@@ -55,18 +55,18 @@ impl Event {
 
     pub(crate) fn element_tag_start(&self) -> Option<&text::Identifier> {
         match self.0 {
-            EventKind::OpeningTag { ref tag, .. } => Some(tag),
-            EventKind::SelfClosedTag { ref tag, .. } => Some(tag),
-            EventKind::VoidTag { ref tag, .. } => Some(tag),
+            EventKind::OpeningTag { ref tag, .. }
+            | EventKind::SelfClosedTag { ref tag, .. }
+            | EventKind::VoidTag { ref tag, .. } => Some(tag),
             _ => None,
         }
     }
 
     pub(crate) fn attributes(&self) -> Option<&Attributes> {
         match self.0 {
-            EventKind::OpeningTag { ref attributes, .. } => Some(attributes),
-            EventKind::SelfClosedTag { ref attributes, .. } => Some(attributes),
-            EventKind::VoidTag { ref attributes, .. } => Some(attributes),
+            EventKind::OpeningTag { ref attributes, .. }
+            | EventKind::SelfClosedTag { ref attributes, .. }
+            | EventKind::VoidTag { ref attributes, .. } => Some(attributes),
             _ => None,
         }
     }

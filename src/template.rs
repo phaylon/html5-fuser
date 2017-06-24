@@ -12,6 +12,7 @@ use std::error;
 use event;
 use parse;
 use transform;
+use text;
 
 /// Invalid input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,6 +227,59 @@ impl Template {
                 .map(rc::Rc::new)
                 .map_err(|error| InputError::Parse { error })?,
         })
+    }
+
+    /// Create a template with a single empty element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <body></body>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_once("body", |html| html
+    ///         .replace_contents(
+    ///             Template::with_element("a")
+    ///             .map_err(Into::into)
+    ///             .and_then(|template| template
+    ///                 .transform(|html| html
+    ///                     .select_once("a", |html| html
+    ///                         .set_attribute("href", "index.html")
+    ///                         .replace_contents("Home")
+    ///                     )
+    ///                 )
+    ///             )
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<body><a href="index.html">Home</a></body>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn with_element<T>(tag: T) -> Result<Template, text::IdentifierError>
+    where T: text::IntoIdentifier {
+        let tag = tag.into_identifier()?;
+        let event = {
+            let attributes = event::Attributes::new(Vec::new());
+            if parse::is_void_tag(&tag) {
+                event::Event(event::EventKind::VoidTag { tag, attributes })
+            } else {
+                event::Event(event::EventKind::SelfClosedTag { tag, attributes })
+            }
+        };
+        let mut events = Vec::new();
+        events.push(event);
+        let events = rc::Rc::new(events);
+        Ok(Template { events })
     }
 
     pub(crate) fn to_stream(&self) -> TemplateStream {
