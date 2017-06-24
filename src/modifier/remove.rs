@@ -66,31 +66,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
-    #[test]
-    fn remove_contents() {
-        test_transform!(
-            Default::default(),
+    test_group!(remove_contents:
+        "remove contents" => transform_test!(
             "<a><b>23</b>45<c>67</c><b>89</b></a>",
             "<a><b></b>45<c>67</c><b></b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .remove_contents()
-                )
-        );
-    }
+            |html| html.select("b", |html| html.remove_contents()),
+        ),
+    );
 
-    #[test]
-    fn remove_all() {
-        test_transform!(
-            Default::default(),
+    test_group!(remove:
+        "remove" => transform_test!(
             "<a><b>23</b>45<c>67</c><b>89</b></a>",
             "<a>45<c>67</c></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .remove()
-                )
-        );
-    }
+            |html| html.select("b", |html| html.remove()),
+        ),
+    );
 }
