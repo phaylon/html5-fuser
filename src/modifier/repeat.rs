@@ -194,37 +194,37 @@ where
 mod tests {
     use std::str::{ FromStr };
 
-    #[test]
-    fn repeat_contents() {
-        test_transform!(
-            Default::default(),
+    test_group!(repeat_contents:
+        "some integers" => transform_test!(
             "<a><b>23<c></c>45</b></a>",
             "<a><b>23<c>3</c>4523<c>4</c>45</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .repeat_contents(3..5, |html, n| html
-                        .select(::select::Tag::from_str("c").unwrap(), move |html| html
-                            .replace_contents(n)
-                        )
-                    )
-                )
-        );
-    }
+            |html| html.select("b", |html| html.repeat_contents(3..5, |html, n| html
+                .select("c", move |html| html.replace_contents(n))
+            )),
+        ),
+        "empty iterator" => transform_test!(
+            "<a><b>23<c></c>45</b></a>",
+            "<a><b></b></a>",
+            |html| html.select("b", |html| html.repeat_contents(0..0, |html, n| html
+                .select("c", move |html| html.replace_contents(n))
+            )),
+        ),
+    );
 
-    #[test]
-    fn repeat() {
-        test_transform!(
-            Default::default(),
+    test_group!(repeat:
+        "some integers" => transform_test!(
             "<a><b>23<c></c>45</b></a>",
             "<a><b>23<c>3</c>45</b><b>23<c>4</c>45</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .repeat(3..5, |html, n| html
-                        .select(::select::Tag::from_str("c").unwrap(), move |html| html
-                            .replace_contents(n)
-                        )
-                    )
-                )
-        );
-    }
+            |html| html.select("b", |html| html.repeat(3..5, |html, n| html
+                .select("c", move |html| html.replace_contents(n))
+            )),
+        ),
+        "empty iterator" => transform_test!(
+            "<a><b>23<c></c>45</b></a>",
+            "<a></a>",
+            |html| html.select("b", |html| html.repeat(0..0, |html, n| html
+                .select("c", move |html| html.replace_contents(n))
+            )),
+        ),
+    );
 }
