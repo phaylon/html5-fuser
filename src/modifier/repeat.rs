@@ -208,6 +208,16 @@ mod tests {
                 .select("c", move |html| html.replace_contents(n))
             )),
         ),
+        "ensure element stream" => transform_test!(
+            "<link>",
+            "<link>",
+            |html| html.select("b", |html| html
+                .repeat_contents(0..0, |html, _n| html
+                    .select("c", move |html| html)
+                )
+                .into_boxed_element()
+            ),
+        ),
     );
 
     test_group!(repeat:
@@ -223,6 +233,13 @@ mod tests {
             "<a></a>",
             |html| html.select("b", |html| html.repeat(0..0, |html, n| html
                 .select("c", move |html| html.replace_contents(n))
+            )),
+        ),
+        "ensure element stream" => transform_test!(
+            "<link>",
+            "<link>",
+            |html| html.select("b", |html| html.repeat(0..0, |html, _n| html
+                .into_boxed_element()
             )),
         ),
     );
