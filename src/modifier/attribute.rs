@@ -238,8 +238,8 @@ mod tests {
         ),
         "ensure element stream" => transform_test!(
             "<a>23</a>",
-            "<a class=\"baz qux\">23</a>",
-            |html| html.select("a", |html| html.add_class("baz").add_class("qux")),
+            "<a class=\"baz\">23</a>",
+            |html| html.select("a", |html| html.add_class("baz").into_boxed_element()),
         ),
     );
 
@@ -256,8 +256,8 @@ mod tests {
         ),
         "ensure element stream" => transform_test!(
             "<a class=\"bar baz\" id=\"xyz\">23</a>",
-            "<a id=\"xyz\">23</a>",
-            |html| html.select("a", |html| html.remove_class("bar").remove_class("baz")),
+            "<a class=\"baz\" id=\"xyz\">23</a>",
+            |html| html.select("a", |html| html.remove_class("bar").into_boxed_element()),
         ),
     );
 
@@ -275,7 +275,7 @@ mod tests {
         "ensure element stream" => transform_test!(
             "<link class=\"bar\">",
             "<link class=\"bar\" id=\"qux\">",
-            |html| html.select("link", |html| html.set_id("first").set_id("qux")),
+            |html| html.select("link", |html| html.set_id("qux").into_boxed_element()),
         ),
     );
 
@@ -288,7 +288,7 @@ mod tests {
         "ensure element stream" => transform_test!(
             "<link id=\"foo\" class=\"bar\">",
             "<link class=\"bar\">",
-            |html| html.select("link", |html| html.remove_id().remove_id()),
+            |html| html.select("link", |html| html.remove_id().into_boxed_element()),
         ),
     );
 
@@ -301,7 +301,7 @@ mod tests {
         "ensure element stream" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a baz=\"qux\">23</a>",
-            |html| html.select("a", |html| html.remove_attribute("foo").remove_attribute("foo")),
+            |html| html.select("a", |html| html.remove_attribute("foo").into_boxed_element()),
         ),
     );
 
@@ -321,7 +321,7 @@ mod tests {
             "<a baz=\"qux\" foo=\"newval\">23</a>",
             |html| html.select("a", |html| html
                 .set_attribute("foo", Some("newval"))
-                .set_attribute("foo", Some("newval"))
+                .into_boxed_element()
             ),
         ),
     );
@@ -342,7 +342,7 @@ mod tests {
             "<a baz=\"qux\" foo=\"newval\">23</a>",
             |html| html.select("a", |html| html
                 .set_attribute_with_value("foo", "newval")
-                .set_attribute_with_value("foo", "newval")
+                .into_boxed_element()
             ),
         ),
     );
@@ -361,10 +361,7 @@ mod tests {
         "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo>23</a>",
-            |html| html.select("a", |html| html
-                .set_empty_attribute("foo")
-                .set_empty_attribute("foo")
-            ),
+            |html| html.select("a", |html| html.set_empty_attribute("foo").into_boxed_element()),
         ),
     );
 
@@ -395,7 +392,7 @@ mod tests {
             "<a baz=\"qux\">23</a>",
             |html| html.select("a", |html| html
                 .replace_attribute_value_if_exists("foo", "newval")
-                .replace_attribute_value_if_exists("foo", "newval")
+                .into_boxed_element()
             ),
         ),
     );
@@ -418,10 +415,10 @@ mod tests {
         ),
         "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
-            "<a baz=\"qux\" foo=\"newval:newval2\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
             |html| html.select("a", |html| html
                 .add_to_attribute("foo", "newval", ":")
-                .add_to_attribute("foo", "newval2", ":")
+                .into_boxed_element()
             ),
         ),
     );
@@ -439,10 +436,10 @@ mod tests {
         ),
         "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
-            "<a baz=\"qux\" foo=\"newval\" foo=\"newval2\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
             |html| html.select("a", |html| html
                 .add_attribute_with_value("foo", "newval")
-                .add_attribute_with_value("foo", "newval2")
+                .into_boxed_element()
             ),
         ),
     );
@@ -460,10 +457,10 @@ mod tests {
         ),
         "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
-            "<a baz=\"qux\" foo=\"newval\" foo=\"newval2\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
             |html| html.select("a", |html| html
                 .add_attribute("foo", Some("newval"))
-                .add_attribute("foo", Some("newval2"))
+                .into_boxed_element()
             ),
         ),
     );
@@ -481,10 +478,10 @@ mod tests {
         ),
         "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
-            "<a baz=\"qux\" foo foo>23</a>",
+            "<a baz=\"qux\" foo>23</a>",
             |html| html.select("a", |html| html
                 .add_empty_attribute("foo")
-                .add_empty_attribute("foo")
+                .into_boxed_element()
             ),
         ),
     );
