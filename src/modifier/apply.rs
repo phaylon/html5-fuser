@@ -99,7 +99,6 @@ enum TemplateState<S, B> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
     test_group!(apply_as_template:
         "with closure" => transform_test!(
