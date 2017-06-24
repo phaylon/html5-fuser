@@ -192,7 +192,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
     test_group!(repeat_contents:
         "some integers" => transform_test!(
