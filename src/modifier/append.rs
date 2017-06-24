@@ -90,36 +90,26 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
-    #[test]
-    fn append_contents() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+    test_group!(append_contents:
+        "append to existing" => transform_test!(
             "<a><b>23</b><c>42</c><b>93</b></a>",
-            "<a><b>23</b><c>42<i>foo</i></c><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("c").unwrap(), |html| html
-                    .append_contents(&new_template)
-                )
-        );
-    }
+            "<a><b>23</b><c>42foo</c><b>93</b></a>",
+            |html| html.select("c", |html| html.append_contents("foo")),
+        ),
+        "append to empty" => transform_test!(
+            "<a><b>23</b><c></c><b>93</b></a>",
+            "<a><b>23</b><c>foo</c><b>93</b></a>",
+            |html| html.select("c", |html| html.append_contents("foo")),
+        ),
+    );
 
-    #[test]
-    fn append() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+    test_group!(append:
+        "append" => transform_test!(
             "<a><b>23</b><c>42</c><b>93</b></a>",
-            "<a><b>23</b><c>42</c><i>foo</i><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("c").unwrap(), |html| html
-                    .append(&new_template)
-                )
-        );
-    }
+            "<a><b>23</b><c>42</c>foo<b>93</b></a>",
+            |html| html.select("c", |html| html.append("foo")),
+        ),
+    );
 }
 
