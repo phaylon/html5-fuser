@@ -305,6 +305,27 @@ mod tests {
         ),
     );
 
+    test_group!(set_attribute:
+        "replace existing attribute" => transform_test!(
+            "<a foo=\"bar\" baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html.set_attribute("foo", Some("newval"))),
+        ),
+        "add new attribute" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html.set_attribute("foo", Some("newval"))),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html
+                .set_attribute("foo", Some("newval"))
+                .set_attribute("foo", Some("newval"))
+            ),
+        ),
+    );
+
     test_group!(set_attribute_value:
         "replace existing attribute" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",

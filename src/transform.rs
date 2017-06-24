@@ -1561,12 +1561,49 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         N: text::IntoIdentifier,
         V: text::IntoValue,
     {
+        self.set_attribute(name, Some(value))
+    }
+
+    /// Set an attribute with an optional value.
+    ///
+    /// All existing attributes with the same name will be removed. If no attribute with
+    /// the given name exists, one will still be added.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <a href="foo.html">Foo</a>
+    ///     <a>Bar</a>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("a", |html| html
+    ///         .set_attribute("href", Some("new.html"))
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<a href="new.html">Foo</a>"#));
+    /// assert!(output.contains(r#"<a href="new.html">Bar</a>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn set_attribute<N, V>(self, name: N, value: Option<V>)
+    -> Api<'t, modifier::Fallible<modifier::attribute::SetAttribute<S>>>
+    where
+        N: text::IntoIdentifier,
+        V: text::IntoValue,
+    {
         Api::pack(modifier::Fallible::new(
             name.into_identifier()
                 .map(move |name| modifier::attribute::SetAttribute::new(
                     self.stream,
                     name,
-                    Some(value.into_value()),
+                    value.map(text::IntoValue::into_value),
                 ))
                 .map_err(Into::into)
         ))
