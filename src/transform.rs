@@ -1501,7 +1501,7 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
     ///
     /// let output = format!("{}", template.transform(|html| html
     ///     .select("a", |html| html
-    ///         .replace_attribute("href", "new.html")
+    ///         .replace_attribute_value_if_exists("href", "new.html")
     ///     )
     /// )?);
     ///
@@ -1510,7 +1510,7 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
     /// # Ok(()) }
     /// # fn main() { run().unwrap() }
     /// ```
-    pub fn replace_attribute<N, V>(self, name: N, value: V)
+    pub fn replace_attribute_value_if_exists<N, V>(self, name: N, value: V)
     -> Api<'t, modifier::Fallible<modifier::attribute::ReplaceAttribute<S>>>
     where
         N: text::IntoIdentifier,

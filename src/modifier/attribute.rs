@@ -368,28 +368,34 @@ mod tests {
         ),
     );
 
-    test_group!(replace_attribute:
+    test_group!(replace_attribute_value_if_exists:
         "replace existing" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html.select("a", |html| html.replace_attribute("foo", "newval")),
+            |html| html.select("a", |html| html
+                .replace_attribute_value_if_exists("foo", "newval")
+            ),
         ),
         "replace multiple" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\" foo=\"false\">23</a>",
             "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html.select("a", |html| html.replace_attribute("foo", "newval")),
+            |html| html.select("a", |html| html
+                .replace_attribute_value_if_exists("foo", "newval")
+            ),
         ),
         "none to replace" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\">23</a>",
-            |html| html.select("a", |html| html.replace_attribute("foo", "newval")),
+            |html| html.select("a", |html| html
+                .replace_attribute_value_if_exists("foo", "newval")
+            ),
         ),
         "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\">23</a>",
             |html| html.select("a", |html| html
-                .replace_attribute("foo", "newval")
-                .replace_attribute("foo", "newval")
+                .replace_attribute_value_if_exists("foo", "newval")
+                .replace_attribute_value_if_exists("foo", "newval")
             ),
         ),
     );
