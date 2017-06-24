@@ -92,65 +92,35 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
-    #[test]
-    fn replace_contents_void() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+    test_group!(replace_contents:
+        "void element" => transform_test!(
             "<a><b>23</b><link><b>93</b></a>",
             "<a><b>23</b><link><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("link").unwrap(), |html| html
-                    .replace_contents(&new_template)
-                )
-        );
-    }
-
-    #[test]
-    fn replace_contents_self_closed() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+            |html| html.select("link", |html| html.replace_contents("foo")),
+        ),
+        "self closed element" => transform_test!(
             "<a><b>23</b><c/><b>93</b></a>",
-            "<a><b>23</b><c><i>foo</i></c><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("c").unwrap(), |html| html
-                    .replace_contents(&new_template)
-                )
-        );
-    }
-
-    #[test]
-    fn replace_contents() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+            "<a><b>23</b><c>foo</c><b>93</b></a>",
+            |html| html.select("c", |html| html.replace_contents("foo")),
+        ),
+        "normal element" => transform_test!(
             "<a><b>23</b><c>42</c><b>93</b></a>",
-            "<a><b>23</b><c><i>foo</i></c><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("c").unwrap(), |html| html
-                    .replace_contents(&new_template)
-                )
-        );
-    }
-
-    #[test]
-    fn replace() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+            "<a><b>23</b><c>foo</c><b>93</b></a>",
+            |html| html.select("c", |html| html.replace_contents("foo")),
+        ),
+        "ensure element stream" => transform_test!(
             "<a><b>23</b><c>42</c><b>93</b></a>",
-            "<a><b>23</b><i>foo</i><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("c").unwrap(), |html| html
-                    .replace(&new_template)
-                )
-        );
-    }
+            "<a><b>23</b><c>foo</c><b>93</b></a>",
+            |html| html.select("c", |html| html.replace_contents("foo").into_boxed_element()),
+        ),
+    );
+
+    test_group!(replace:
+        "replace" => transform_test!(
+            "<a><b>23</b><c>42</c><b>93</b></a>",
+            "<a><b>23</b>foo<b>93</b></a>",
+            |html| html.select("c", |html| html.replace("foo")),
+        ),
+    );
 }
