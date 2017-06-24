@@ -224,272 +224,231 @@ impl<S> SetAttribute<S> where S: event::ElementStream {
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
-    #[test]
-    fn add_class() {
-        test_transform!(
-            Default::default(),
+    test_group!(add_class:
+        "add to existing" => transform_test!(
             "<a class=\"foo bar\">23</a>",
             "<a class=\"foo bar baz\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_class("baz")
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.add_class("baz")),
+        ),
+        "add to none" => transform_test!(
             "<a>23</a>",
             "<a class=\"baz\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_class("baz")
-                )
-        );
-    }
+            |html| html.select("a", |html| html.add_class("baz")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a>23</a>",
+            "<a class=\"baz qux\">23</a>",
+            |html| html.select("a", |html| html.add_class("baz").add_class("qux")),
+        ),
+    );
 
-    #[test]
-    fn remove_class() {
-        test_transform!(
-            Default::default(),
+    test_group!(remove_class:
+        "remove one of many" => transform_test!(
             "<a class=\"foo  bar baz\" id=\"xyz\">23</a>",
             "<a class=\"foo baz\" id=\"xyz\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .remove_class("bar")
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.remove_class("bar")),
+        ),
+        "remove last class" => transform_test!(
             "<a class=\"bar\" id=\"xyz\">23</a>",
             "<a id=\"xyz\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .remove_class("bar")
-                )
-        );
-    }
+            |html| html.select("a", |html| html.remove_class("bar")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a class=\"bar baz\" id=\"xyz\">23</a>",
+            "<a id=\"xyz\">23</a>",
+            |html| html.select("a", |html| html.remove_class("bar").remove_class("baz")),
+        ),
+    );
 
-    #[test]
-    fn set_id() {
-        test_transform!(
-            Default::default(),
+    test_group!(set_id:
+        "set with existing id" => transform_test!(
             "<link id=\"foo\" class=\"bar\">",
             "<link class=\"bar\" id=\"qux\">",
-            |html| html
-                .select(::select::Tag::from_str("link").unwrap(), |html| html
-                    .set_id("qux")
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("link", |html| html.set_id("qux")),
+        ),
+        "set without existing id" => transform_test!(
             "<link class=\"bar\">",
             "<link class=\"bar\" id=\"qux\">",
-            |html| html
-                .select(::select::Tag::from_str("link").unwrap(), |html| html
-                    .set_id("qux")
-                )
-        );
-    }
+            |html| html.select("link", |html| html.set_id("qux")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<link class=\"bar\">",
+            "<link class=\"bar\" id=\"qux\">",
+            |html| html.select("link", |html| html.set_id("first").set_id("qux")),
+        ),
+    );
 
-    #[test]
-    fn remove_id() {
-        test_transform!(
-            Default::default(),
+    test_group!(remove_id:
+        "remove existing" => transform_test!(
             "<link id=\"foo\" class=\"bar\">",
             "<link class=\"bar\">",
-            |html| html
-                .select(::select::Tag::from_str("link").unwrap(), |html| html
-                    .remove_id()
-                )
-        );
-    }
+            |html| html.select("link", |html| html.remove_id()),
+        ),
+        "ensure element stream" => transform_test!(
+            "<link id=\"foo\" class=\"bar\">",
+            "<link class=\"bar\">",
+            |html| html.select("link", |html| html.remove_id().remove_id()),
+        ),
+    );
 
-    #[test]
-    fn void() {
-        test_transform!(
-            Default::default(),
-            "<link foo=\"bar\" baz=\"qux\">",
-            "<link baz=\"qux\">",
-            |html| html
-                .select(::select::Tag::from_str("link").unwrap(), |html| html
-                    .remove_attribute(::text::Identifier::from_str("foo").unwrap())
-                )
-        );
-    }
-
-    #[test]
-    fn self_closed() {
-        test_transform!(
-            Default::default(),
-            "<a foo=\"bar\" baz=\"qux\" />",
-            "<a baz=\"qux\" />",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .remove_attribute(::text::Identifier::from_str("foo").unwrap())
-                )
-        );
-    }
-
-    #[test]
-    fn remove_attribute() {
-        test_transform!(
-            Default::default(),
+    test_group!(remove_attribute:
+        "remove existing" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a baz=\"qux\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .remove_attribute(::text::Identifier::from_str("foo").unwrap())
-                )
-        );
-    }
+            |html| html.select("a", |html| html.remove_attribute("foo")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a foo=\"bar\" baz=\"qux\">23</a>",
+            "<a baz=\"qux\">23</a>",
+            |html| html.select("a", |html| html.remove_attribute("foo").remove_attribute("foo")),
+        ),
+    );
 
-    #[test]
-    fn set_empty_attribute() {
-        test_transform!(
-            Default::default(),
+    test_group!(set_attribute:
+        "replace existing attribute" => transform_test!(
+            "<a foo=\"bar\" baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html.set_attribute("foo", "newval")),
+        ),
+        "add new attribute" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html.set_attribute("foo", "newval")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html
+                .set_attribute("foo", "newval")
+                .set_attribute("foo", "newval")
+            ),
+        ),
+    );
+
+    test_group!(set_empty_attribute:
+        "replace existing with value" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo>23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .set_empty_attribute(::text::Identifier::from_str("foo").unwrap())
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.set_empty_attribute("foo")),
+        ),
+        "add new attribute" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo>23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .set_empty_attribute(::text::Identifier::from_str("foo").unwrap())
-                )
-        );
-    }
-
-    #[test]
-    fn set_attribute() {
-        test_transform!(
-            Default::default(),
-            "<a foo=\"bar\" baz=\"qux\">23</a>",
-            "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .set_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.set_empty_attribute("foo")),
+        ),
+        "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
-            "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .set_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
-                )
-        );
-    }
+            "<a baz=\"qux\" foo>23</a>",
+            |html| html.select("a", |html| html
+                .set_empty_attribute("foo")
+                .set_empty_attribute("foo")
+            ),
+        ),
+    );
 
-    #[test]
-    fn replace_attribute() {
-        test_transform!(
-            Default::default(),
+    test_group!(replace_attribute:
+        "replace existing" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .replace_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.replace_attribute("foo", "newval")),
+        ),
+        "replace multiple" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\" foo=\"false\">23</a>",
             "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .replace_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.replace_attribute("foo", "newval")),
+        ),
+        "none to replace" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .replace_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
-                )
-        );
-    }
+            |html| html.select("a", |html| html.replace_attribute("foo", "newval")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\">23</a>",
+            |html| html.select("a", |html| html
+                .replace_attribute("foo", "newval")
+                .replace_attribute("foo", "newval")
+            ),
+        ),
+    );
 
-    #[test]
-    fn add_to_attribute() {
-        test_transform!(
-            Default::default(),
+    test_group!(add_to_attribute:
+        "add to existing" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a foo=\"bar:newval\" baz=\"qux\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_to_attribute(
-                        ::text::Identifier::from_str("foo").unwrap(),
-                        "newval",
-                        ":",
-                    )
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.add_to_attribute("foo", "newval", ":")),
+        ),
+        "add new" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_to_attribute(
-                        ::text::Identifier::from_str("foo").unwrap(),
-                        "newval",
-                        ":",
-                    )
-                )
-        );
-    }
+            |html| html.select("a", |html| html.add_to_attribute("foo", "newval", ":")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval:newval2\">23</a>",
+            |html| html.select("a", |html| html
+                .add_to_attribute("foo", "newval", ":")
+                .add_to_attribute("foo", "newval2", ":")
+            ),
+        ),
+    );
 
-    #[test]
-    fn add_attribute() {
-        test_transform!(
-            Default::default(),
+    test_group!(add_attribute:
+        "add to existing" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a foo=\"bar\" baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.add_attribute("foo", "newval")),
+        ),
+        "add new" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_attribute(::text::Identifier::from_str("foo").unwrap(), "newval")
-                )
-        );
-    }
+            |html| html.select("a", |html| html.add_attribute("foo", "newval")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\" foo=\"newval2\">23</a>",
+            |html| html.select("a", |html| html
+                .add_attribute("foo", "newval")
+                .add_attribute("foo", "newval2")
+            ),
+        ),
+    );
 
-    #[test]
-    fn add_empty_attribute() {
-        test_transform!(
-            Default::default(),
+    test_group!(add_empty_attribute:
+        "add to existing with value" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a foo=\"bar\" baz=\"qux\" foo>23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_empty_attribute(::text::Identifier::from_str("foo").unwrap())
-                )
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("a", |html| html.add_empty_attribute("foo")),
+        ),
+        "add new" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo>23</a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .add_empty_attribute(::text::Identifier::from_str("foo").unwrap())
-                )
-        );
-    }
+            |html| html.select("a", |html| html.add_empty_attribute("foo")),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo foo>23</a>",
+            |html| html.select("a", |html| html
+                .add_empty_attribute("foo")
+                .add_empty_attribute("foo")
+            ),
+        ),
+    );
+
+    test_group!(void_elements:
+        "remove attribute" => transform_test!(
+            "<link foo=\"bar\" baz=\"qux\">",
+            "<link baz=\"qux\">",
+            |html| html.select("link", |html| html.remove_attribute("foo")),
+        ),
+    );
+
+    test_group!(self_closed_elements:
+        "remove attribute" => transform_test!(
+            "<a foo=\"bar\" baz=\"qux\" />",
+            "<a baz=\"qux\" />",
+            |html| html.select("a", |html| html.remove_attribute("foo")),
+        ),
+    );
 }
