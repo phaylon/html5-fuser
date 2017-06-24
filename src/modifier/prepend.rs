@@ -101,6 +101,11 @@ mod tests {
             "<a><b>23</b><c>foo</c><b>93</b></a>",
             |html| html.select("c", |html| html.prepend_contents("foo")),
         ),
+        "ensure element stream" => transform_test!(
+            "<a><b>23</b><c></c><b>93</b></a>",
+            "<a><b>23</b><c>foo</c><b>93</b></a>",
+            |html| html.select("c", |html| html.prepend_contents("foo").into_boxed_element()),
+        ),
     );
 
     test_group!(prepend:
