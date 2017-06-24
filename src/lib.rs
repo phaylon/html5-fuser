@@ -53,6 +53,32 @@
 extern crate tendril;
 
 #[cfg(test)]
+macro_rules! test_group {
+    ($name:ident: $( $title:expr => $test:expr ),* $(,)*) => {
+        #[test]
+        fn $name() {
+            use std::panic;
+            $(
+                panic::catch_unwind(|| $test)
+                .expect(&format!("Failed test case: {}", $title));
+            )*
+        }
+    }
+}
+
+#[cfg(test)]
+macro_rules! transform_test {
+    ($input:expr, $expected:expr, $transform:expr $(,)*) => {
+        {
+            let template = ::Template::from_str($input, Default::default()).unwrap();
+            let modified = template.transform($transform).unwrap();
+            let rendered = format!("{}", &modified);
+            assert_eq!(rendered, $expected);
+        }
+    }
+}
+
+#[cfg(test)]
 macro_rules! test_transform {
     ($options:expr, $input:expr, $expected:expr, $transform:expr $(,)*) => {{
         let template = ::Template::from_str($input, $options).unwrap();
