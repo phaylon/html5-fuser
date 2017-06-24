@@ -27,7 +27,7 @@ use text;
 ///
 /// let output = format!("{}", template.transform(|html| html
 ///     .select("input", |html| html
-///         .set_attribute("name", &value)
+///         .set_attribute_value("name", &value)
 ///     )
 ///     .select(".field-name", |html| html
 ///         .replace_contents(&value)

@@ -250,7 +250,7 @@ impl Template {
     ///             .and_then(|template| template
     ///                 .transform(|html| html
     ///                     .select_once("a", |html| html
-    ///                         .set_attribute("href", "index.html")
+    ///                         .set_attribute_value("href", "index.html")
     ///                         .replace_contents("Home")
     ///                     )
     ///                 )

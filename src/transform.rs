@@ -1546,7 +1546,7 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
     ///
     /// let output = format!("{}", template.transform(|html| html
     ///     .select("a", |html| html
-    ///         .set_attribute("href", "new.html")
+    ///         .set_attribute_value("href", "new.html")
     ///     )
     /// )?);
     ///
@@ -1555,7 +1555,7 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
     /// # Ok(()) }
     /// # fn main() { run().unwrap() }
     /// ```
-    pub fn set_attribute<N, V>(self, name: N, value: V)
+    pub fn set_attribute_value<N, V>(self, name: N, value: V)
     -> Api<'t, modifier::Fallible<modifier::attribute::SetAttribute<S>>>
     where
         N: text::IntoIdentifier,
