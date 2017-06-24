@@ -10,8 +10,10 @@ use transform;
 /// Reusable builder allowing mutation with an additional argument.
 pub trait BuildMutMapped<S, T> {
 
+    /// Type of the transformed stream.
     type Stream: event::Stream;
 
+    /// Build the transformation.
     fn build_mut_mapped<'t>(&mut self, stream: transform::Api<'t, S>, value: T)
     -> transform::Api<'t, Self::Stream>;
 }
@@ -33,8 +35,10 @@ where
 /// Reusable builder allowing mutation.
 pub trait BuildMut<S> {
 
+    /// Type of the transformed stream.
     type Stream: event::Stream;
 
+    /// Build the transformation.
     fn build_mut<'t>(&mut self, stream: transform::Api<'t, S>)
     -> transform::Api<'t, Self::Stream>;
 }
@@ -56,8 +60,10 @@ where
 /// A builder that can only be used once.
 pub trait BuildOnce<S> {
 
+    /// Type of the transformed stream.
     type Stream: event::Stream;
 
+    /// Build the transformation.
     fn build_once(self, stream: transform::Api<S>)
     -> transform::Api<Self::Stream>;
 }

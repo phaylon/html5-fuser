@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 
 //! A stream based HTML5 templating system with code side logic.
 //!
@@ -51,7 +52,7 @@ extern crate tendril;
 
 #[cfg(test)]
 macro_rules! test_transform {
-    ($options:expr, $input:expr, $expected:expr, $transform:expr) => {{
+    ($options:expr, $input:expr, $expected:expr, $transform:expr $(,)*) => {{
         let template = ::Template::from_str($input, $options).unwrap();
         let modified = template.transform($transform).unwrap();
         let rendered = format!("{}", &modified);
@@ -62,7 +63,7 @@ macro_rules! test_transform {
 
 #[cfg(test)]
 macro_rules! test_stream_error {
-    ($options:expr, $input:expr, $expected:pat, $transform:expr) => {{
+    ($options:expr, $input:expr, $expected:pat, $transform:expr $(,)*) => {{
         let template = ::Template::from_str($input, $options).unwrap();
         let result = template.transform($transform);
         if let Err($expected) = result {

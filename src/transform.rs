@@ -152,6 +152,9 @@ impl<'t, S> Api<'t, S> {
 type SelectAny<S, M, B> = modifier::Fallible<modifier::select::SelectAny<S, M, B>>;
 type SelectDirect<S, M, B> = modifier::Fallible<modifier::select::SelectDirect<S, M, B>>;
 
+type SelectAnyOnce<S, M, B> = modifier::Fallible<modifier::select::SelectAnyOnce<S, M, B>>;
+type SelectDirectOnce<S, M, B> = modifier::Fallible<modifier::select::SelectDirectOnce<S, M, B>>;
+
 /// This is the general API implementation that applies to all kinds of streams.
 impl<'t, S> Api<'t, S> where S: event::Stream {
 
@@ -191,313 +194,6 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
     /// ```
     pub fn into_boxed(self) -> BoxedApi<'t> where S: 'static {
         Api::pack(Box::new(self.stream))
-    }
-
-    /// Apply transformations to each matching element in a stream.
-    ///
-    /// This function will match elements at any depth, but the transformation is not
-    /// recursive. The stream provided to the transformation closure will be an element stream.
-    /// The resulting stream is a non-element stream.
-    ///
-    /// # Examples
-    ///
-    /// Transformations will be applied at any depth:
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <span id="outer" class="name">Foo</span>
-    ///     <div>
-    ///         <span id="inner" class="name">Bar</span>
-    ///     </div>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select(".name", |html| html
-    ///         .add_class("highlight")
-    ///     )
-    /// )?);
-    ///
-    /// assert!(output.contains(r#"<span id="outer" class="name highlight">"#));
-    /// assert!(output.contains(r#"<span id="inner" class="name highlight">"#));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    ///
-    /// Transformations are not recursive:
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <div class="outer main">
-    ///         <div class="inner main">Content</div>
-    ///     </div>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select(".main", |html| html
-    ///         .add_class("highlight")
-    ///     )
-    /// )?);
-    ///
-    /// assert!(output.contains(
-    ///     r#"<div class="outer main highlight">"#,
-    /// ));
-    /// assert!(output.contains(
-    ///     r#"<div class="inner main">"#,
-    /// ));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    pub fn select<M, B, R>(self, selector: M, builder: B)
-    -> Api<'t, SelectAny<S, M::Selector, B>>
-    where
-        M: select::IntoSelector,
-        B: for<'tb> FnMut(Api<'tb, modifier::select::BuildElementStream<S>>) -> Api<'tb, R>,
-        R: event::Stream,
-    {
-        Api::pack(modifier::Fallible::new(match selector.into_selector() {
-            Ok(selector) =>
-                Ok(modifier::select::SelectAny::new(self.stream, selector, builder)),
-            Err(error) => Err(error.into()),
-        }))
-    }
-
-    /// Apply transformations to each matching top-level element in a stream.
-    ///
-    /// This function will match elements at the top level of the stream.
-    /// The stream provided to the transformation closure will be an element stream.
-    /// The resulting stream is a non-element stream.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <span id="outer" class="name">Foo</span>
-    ///     <div>
-    ///         <span id="inner" class="name">Bar</span>
-    ///     </div>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select_direct(".name", |html| html
-    ///         .add_class("highlight")
-    ///     )
-    /// )?);
-    ///
-    /// assert!(output.contains(
-    ///     r#"<span id="outer" class="name highlight">"#,
-    /// ));
-    /// assert!(output.contains(
-    ///     r#"<span id="inner" class="name">"#,
-    /// ));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    pub fn select_direct<M, B, R>(self, selector: M, builder: B)
-    -> Api<'t, SelectDirect<S, M::Selector, B>>
-    where
-        M: select::IntoSelector,
-        B: for<'tb> FnMut(Api<'tb, modifier::select::BuildElementStream<S>>) -> Api<'tb, R>,
-        R: event::Stream,
-    {
-        Api::pack(modifier::Fallible::new(match selector.into_selector() {
-            Ok(selector) =>
-                Ok(modifier::select::SelectDirect::new(self.stream, selector, builder)),
-            Err(error) => Err(error.into()),
-        }))
-    }
-
-    /// Removes all elements of the substream.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <div><h1>Title</h1><p>Content</p><p>More Content</p></div>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select("p", |html| html.remove())
-    /// )?);
-    ///
-    /// assert!(output.contains(
-    ///     r#"<div><h1>Title</h1></div>"#,
-    /// ));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    pub fn remove(self) -> Api<'t, modifier::remove::Remove<S>> {
-        Api::pack(modifier::remove::Remove::new(self.stream))
-    }
-
-    /// Emit another stream before the current one.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <div><p>Content</p></div>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let header_template = Template::from_str(
-    ///     r#"<h1>Title</h1>"#,
-    ///     ParseOptions::default(),
-    /// )?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select("p", |html| html
-    ///         .prepend(&header_template)
-    ///     )
-    /// )?);
-    ///
-    /// assert!(output.contains(
-    ///     r#"<div><h1>Title</h1><p>Content</p></div>"#,
-    /// ));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    pub fn prepend<N>(self, stream: N) -> Api<'t, modifier::prepend::Prepend<S, N::Stream>>
-    where
-        N: event::IntoStream,
-    {
-        Api::pack(modifier::prepend::Prepend::new(self.stream, stream.into_stream()))
-    }
-
-    /// Emit another stream after the current one.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <div><h1>Title</h1></div>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let content_template = Template::from_str(
-    ///     r#"<p>Content</p>"#,
-    ///     ParseOptions::default(),
-    /// )?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select("h1", |html| html
-    ///         .append(&content_template)
-    ///     )
-    /// )?);
-    ///
-    /// assert!(output.contains(
-    ///     r#"<div><h1>Title</h1><p>Content</p></div>"#,
-    /// ));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    pub fn append<N>(self, stream: N) -> Api<'t, modifier::append::Append<S, N::Stream>>
-    where
-        N: event::IntoStream,
-    {
-        Api::pack(modifier::append::Append::new(self.stream, stream.into_stream()))
-    }
-
-    /// Replace the current stream with a different one.
-    ///
-    /// This effectively consumes the existing stream and drops all events, then emits
-    /// the events from the new stream.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <div><div id="title-placeholder"/>Content</div>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let title_template = Template::from_str(
-    ///     r#"<h1>Title</h1>"#,
-    ///     ParseOptions::default(),
-    /// )?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select("#title-placeholder", |html| html
-    ///         .replace(&title_template)
-    ///     )
-    /// )?);
-    ///
-    /// assert!(output.contains(
-    ///     r#"<div><h1>Title</h1>Content</div>"#,
-    /// ));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    pub fn replace<N>(self, stream: N) -> Api<'t, modifier::replace::Replace<S, N::Stream>>
-    where
-        N: event::IntoStream,
-    {
-        Api::pack(modifier::replace::Replace::new(self.stream, stream.into_stream()))
-    }
-
-    /// Repeats a stream for each item of an iterator.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::error;
-    /// # fn run() -> Result<(), Box<error::Error>> {
-    /// use html5_fuser::{ Template, ParseOptions };
-    ///
-    /// let template = Template::from_str(r#"
-    ///     <ul><li>Item</li></ul>
-    /// "#, ParseOptions::default())?;
-    ///
-    /// let output = format!("{}", template.transform(|html| html
-    ///     .select("ul", |html| html
-    ///         .subselect("li", |html| html
-    ///             .repeat(1..3, |html, value| html
-    ///                 .append_contents(" ")
-    ///                 .append_contents(value)
-    ///             )
-    ///         )
-    ///     )
-    /// )?);
-    ///
-    /// assert!(output.contains(
-    ///     r#"<ul><li>Item 1</li><li>Item 2</li></ul>"#,
-    /// ));
-    /// # Ok(()) }
-    /// # fn main() { run().unwrap() }
-    /// ```
-    pub fn repeat<I, B, R>(self, iter: I, builder: B)
-    -> Api<'t, modifier::repeat::Repeat<S, I::IntoIter, B>>
-    where
-        I: IntoIterator,
-        B: for<'tb> FnMut(Api<'tb, modifier::repeat::MaybeElementTemplate<S>>, I::Item)
-            -> Api<'tb, R>,
-        R: event::Stream,
-    {
-        Api::pack(modifier::repeat::Repeat::new(self.stream, iter.into_iter(), builder))
     }
 
     /// Perform the given transformation on the stream.
@@ -695,8 +391,8 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
     ///
     /// fn transform_head<'a>(html: BoxedApi<'a>, title: &str) -> BoxedApi<'a> {
     ///     let title = Data::from_unencoded_str(title);
-    ///     html.select("title",
-    ///         move |html| html.replace_contents(title.clone())
+    ///     html.select_once("title",
+    ///         move |html| html.replace_contents(title)
     ///     )
     ///     .into_boxed()
     /// }
@@ -734,14 +430,14 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
     /// use html5_fuser::{ Template, ParseOptions, StreamError };
     /// use html5_fuser::text::{ Data };
     ///
-    /// fn transform_head<'a>(
+    /// fn transform_head(
     ///     template: Template,
     ///     title: &str,
     /// ) -> Result<Template, StreamError> {
     ///     let title = Data::from_unencoded_str(title);
     ///     template.transform(|html| html
-    ///         .select("title",
-    ///             |html| html.replace_contents(title.clone())
+    ///         .select_once("title",
+    ///             |html| html.replace_contents(title)
     ///         )
     ///     )
     /// }
@@ -769,10 +465,421 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
     {
         Api::pack(modifier::apply::TemplateApply::new(self.stream, builder))
     }
+
+    /// Apply transformations to each matching element in a stream.
+    ///
+    /// This function will match elements at any depth, but the transformation is not
+    /// recursive. The stream provided to the transformation closure will be an element stream.
+    /// The resulting stream is a non-element stream.
+    ///
+    /// # Examples
+    ///
+    /// Transformations will be applied at any depth:
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <span id="outer" class="name">Foo</span>
+    ///     <div>
+    ///         <span id="inner" class="name">Bar</span>
+    ///     </div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select(".name", |html| html
+    ///         .add_class("highlight")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<span id="outer" class="name highlight">"#));
+    /// assert!(output.contains(r#"<span id="inner" class="name highlight">"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    ///
+    /// Transformations are not recursive:
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div class="outer main">
+    ///         <div class="inner main">Content</div>
+    ///     </div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select(".main", |html| html
+    ///         .add_class("highlight")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<div class="outer main highlight">"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<div class="inner main">"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn select<M, B, R>(self, selector: M, builder: B)
+    -> Api<'t, SelectAny<S, M::Selector, B>>
+    where
+        M: select::IntoSelector,
+        B: for<'tb> FnMut(Api<'tb, modifier::select::BuildElementStream<S>>) -> Api<'tb, R>,
+        R: event::Stream,
+    {
+        Api::pack(modifier::Fallible::new(match selector.into_selector() {
+            Ok(selector) =>
+                Ok(modifier::select::SelectAny::new(self.stream, selector, builder)),
+            Err(error) => Err(error.into()),
+        }))
+    }
+    
+    /// Apply transformations to the first matching element in a stream.
+    ///
+    /// This function will match elements at any depth, but the transformation is not
+    /// recursive. The stream provided to the transformation closure will be an element stream.
+    /// The resulting stream is a non-element stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    /// use html5_fuser::text::{ Data };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <head><title>Title</title></head>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let title = Data::from_unencoded_str("New Title");
+    /// let output = format!("{}", template.transform(|html| html
+    ///     // No need to .clone() the title since we're in a FnOnce
+    ///     .select_once("title", |html| html.replace_contents(title))
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<title>New Title</title>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn select_once<M, B, R>(self, selector: M, builder: B)
+    -> Api<'t, SelectAnyOnce<S, M::Selector, B>>
+    where
+        M: select::IntoSelector,
+        B: for<'tb> FnOnce(Api<'tb, modifier::select::BuildElementStream<S>>) -> Api<'tb, R>,
+        R: event::Stream,
+    {
+        Api::pack(modifier::Fallible::new(match selector.into_selector() {
+            Ok(selector) =>
+                Ok(modifier::select::SelectAnyOnce::new(self.stream, selector, builder)),
+            Err(error) => Err(error.into()),
+        }))
+    }
+
+    /// Apply transformations to each matching top-level element in a stream.
+    ///
+    /// This function will match elements at the top level of the stream.
+    /// The stream provided to the transformation closure will be an element stream.
+    /// The resulting stream is a non-element stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <span id="outer" class="name">Foo</span>
+    ///     <div>
+    ///         <span id="inner" class="name">Bar</span>
+    ///     </div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_direct(".name", |html| html
+    ///         .add_class("highlight")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<span id="outer" class="name highlight">"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<span id="inner" class="name">"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn select_direct<M, B, R>(self, selector: M, builder: B)
+    -> Api<'t, SelectDirect<S, M::Selector, B>>
+    where
+        M: select::IntoSelector,
+        B: for<'tb> FnMut(Api<'tb, modifier::select::BuildElementStream<S>>) -> Api<'tb, R>,
+        R: event::Stream,
+    {
+        Api::pack(modifier::Fallible::new(match selector.into_selector() {
+            Ok(selector) =>
+                Ok(modifier::select::SelectDirect::new(self.stream, selector, builder)),
+            Err(error) => Err(error.into()),
+        }))
+    }
+
+    /// Apply transformations to the first matching top-level element in a stream.
+    ///
+    /// This function will match elements at the top level of the stream.
+    /// The stream provided to the transformation closure will be an element stream.
+    /// The resulting stream is a non-element stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <span id="outer1" class="name">Foo</span>
+    ///     <div>
+    ///         <span id="inner" class="name">Baz</span>
+    ///     </div>
+    ///     <span id="outer2" class="name">Foo</span>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_direct_once(".name", |html| html
+    ///         .add_class("highlight")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<span id="outer1" class="name highlight">"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<span id="outer2" class="name">"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<span id="inner" class="name">"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn select_direct_once<M, B, R>(self, selector: M, builder: B)
+    -> Api<'t, SelectDirectOnce<S, M::Selector, B>>
+    where
+        M: select::IntoSelector,
+        B: for<'tb> FnOnce(Api<'tb, modifier::select::BuildElementStream<S>>) -> Api<'tb, R>,
+        R: event::Stream,
+    {
+        Api::pack(modifier::Fallible::new(match selector.into_selector() {
+            Ok(selector) =>
+                Ok(modifier::select::SelectDirectOnce::new(self.stream, selector, builder)),
+            Err(error) => Err(error.into()),
+        }))
+    }
+
+    /// Removes all elements of the substream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div><h1>Title</h1><p>Content</p><p>More Content</p></div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("p", |html| html.remove())
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<div><h1>Title</h1></div>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn remove(self) -> Api<'t, modifier::remove::Remove<S>> {
+        Api::pack(modifier::remove::Remove::new(self.stream))
+    }
+
+    /// Emit another stream before the current one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div><p>Content</p></div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let header_template = Template::from_str(
+    ///     r#"<h1>Title</h1>"#,
+    ///     ParseOptions::default(),
+    /// )?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("p", |html| html
+    ///         .prepend(&header_template)
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<div><h1>Title</h1><p>Content</p></div>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn prepend<N>(self, stream: N) -> Api<'t, modifier::prepend::Prepend<S, N::Stream>>
+    where
+        N: event::IntoStream,
+    {
+        Api::pack(modifier::prepend::Prepend::new(self.stream, stream.into_stream()))
+    }
+
+    /// Emit another stream after the current one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div><h1>Title</h1></div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let content_template = Template::from_str(
+    ///     r#"<p>Content</p>"#,
+    ///     ParseOptions::default(),
+    /// )?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("h1", |html| html
+    ///         .append(&content_template)
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<div><h1>Title</h1><p>Content</p></div>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn append<N>(self, stream: N) -> Api<'t, modifier::append::Append<S, N::Stream>>
+    where
+        N: event::IntoStream,
+    {
+        Api::pack(modifier::append::Append::new(self.stream, stream.into_stream()))
+    }
+
+    /// Replace the current stream with a different one.
+    ///
+    /// This effectively consumes the existing stream and drops all events, then emits
+    /// the events from the new stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div><div id="title-placeholder"/>Content</div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let title_template = Template::from_str(
+    ///     r#"<h1>Title</h1>"#,
+    ///     ParseOptions::default(),
+    /// )?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("#title-placeholder", |html| html
+    ///         .replace(&title_template)
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<div><h1>Title</h1>Content</div>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn replace<N>(self, stream: N) -> Api<'t, modifier::replace::Replace<S, N::Stream>>
+    where
+        N: event::IntoStream,
+    {
+        Api::pack(modifier::replace::Replace::new(self.stream, stream.into_stream()))
+    }
+
+    /// Repeats a stream for each item of an iterator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <ul><li>Item</li></ul>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("ul", |html| html
+    ///         .subselect("li", |html| html
+    ///             .repeat(1..3, |html, value| html
+    ///                 .append_contents(" ")
+    ///                 .append_contents(value)
+    ///             )
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<ul><li>Item 1</li><li>Item 2</li></ul>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn repeat<I, B, R>(self, iter: I, builder: B)
+    -> Api<'t, modifier::repeat::Repeat<S, I::IntoIter, B>>
+    where
+        I: IntoIterator,
+        B: for<'tb> FnMut(Api<'tb, modifier::repeat::MaybeElementTemplate<S>>, I::Item)
+            -> Api<'tb, R>,
+        R: event::Stream,
+    {
+        Api::pack(modifier::repeat::Repeat::new(self.stream, iter.into_iter(), builder))
+    }
 }
 
-type SubSelectAny<S, M, B> = modifier::Fallible<modifier::select::SubSelectAny<S, M, B>>;
-type SubSelectDirect<S, M, B> = modifier::Fallible<modifier::select::SubSelectDirect<S, M, B>>;
+type SubSelectAny<S, M, B> =
+    modifier::Fallible<modifier::select::SubSelectAny<S, M, B>>;
+
+type SubSelectDirect<S, M, B> =
+    modifier::Fallible<modifier::select::SubSelectDirect<S, M, B>>;
+
+type SubSelectAnyOnce<S, M, B> =
+    modifier::Fallible<modifier::select::SubSelectAnyOnce<S, M, B>>;
+
+type SubSelectDirectOnce<S, M, B> =
+    modifier::Fallible<modifier::select::SubSelectDirectOnce<S, M, B>>;
 
 /// This is the API implementation specific to element streams.
 ///
@@ -780,10 +887,125 @@ type SubSelectDirect<S, M, B> = modifier::Fallible<modifier::select::SubSelectDi
 /// specifiers.
 impl<'t, S> Api<'t, S> where S: event::ElementStream {
 
+    /// Boxes the element stream.
+    ///
+    /// Similar to `into_boxed` but instead boxes the `ElementStream` allowing element
+    /// transformations on the boxed stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{
+    ///     Template, ParseOptions, StreamError, BoxedElementApi,
+    /// };
+    /// use html5_fuser::text::{ Data };
+    ///
+    /// fn transform_title<'a>(
+    ///     html: BoxedElementApi<'a>,
+    ///     title: &str,
+    /// ) -> BoxedElementApi<'a> {
+    ///     let title = Data::from_unencoded_str(title);
+    ///     html.replace_contents(title)
+    ///         .into_boxed_element()
+    /// }
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <head><title>Title</title></head>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("title", |html| html
+    ///         .apply(|html|
+    ///             transform_title(html.into_boxed_element(), "New Title")
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<title>New Title</title>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn into_boxed_element(self) -> BoxedElementApi<'t> where S: 'static {
         Api::pack(Box::new(self.stream))
     }
 
+    /// Box the stream and apply the transformation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{
+    ///     Template, ParseOptions, StreamError, BoxedElementApi,
+    /// };
+    /// use html5_fuser::text::{ Data };
+    ///
+    /// fn transform_title<'a>(
+    ///     html: BoxedElementApi<'a>,
+    ///     title: &str,
+    /// ) -> BoxedElementApi<'a> {
+    ///     let title = Data::from_unencoded_str(title);
+    ///     html.replace_contents(title)
+    ///         .into_boxed_element()
+    /// }
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <head><title>Title</title></head>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("title", |html| html
+    ///         .apply_as_boxed_element(|html|
+    ///             transform_title(html, "New Title")
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<title>New Title</title>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn apply_as_boxed_element<B, R>(self, builder: B) -> Api<'t, R>
+    where
+        B: for<'tb> FnOnce(BoxedElementApi<'tb>) -> Api<'tb, R>,
+        R: event::Stream,
+        S: 'static,
+    {
+        builder(self.into_boxed_element())
+    }
+
+    /// Transform the contents of the current stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div id="one">Foo</div>
+    ///     <div id="two">Foo</div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("#one", |html| html
+    ///         .subselect_contents(|html| html.remove())
+    ///     )
+    ///     // is the same as
+    ///     .select("#two", |html| html
+    ///         .remove_contents()
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<div id="one"></div>"#));
+    /// assert!(output.contains(r#"<div id="two"></div>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn subselect_contents<B, R>(self, builder: B)
     -> Api<'t, modifier::select::SelectContent<S, B>>
     where
@@ -793,6 +1015,40 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         Api::pack(modifier::select::SelectContent::new(self.stream, builder))
     }
 
+    /// Apply transformation to all matching elements in the contents of the current element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <body><div id="outer"><div id="inner">23</div></div></body>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("div", |html| html
+    ///         .subselect("div", |html| html.remove())
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<body><div id="outer"></div></body>"#,
+    /// ));
+    /// 
+    /// // With select the current element is reselected.
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("div", |html| html
+    ///         .select("div", |html| html.remove())
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<body></body>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn subselect<M, B, R>(self, selector: M, builder: B)
     -> Api<'t, SubSelectAny<S, M::Selector, B>>
     where
@@ -807,6 +1063,79 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         }))
     }
 
+    /// Apply transformation to the first matching element in the contents of the current
+    /// element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div>
+    ///         <div>First</div>
+    ///         <div>Second</div>
+    ///     </div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("div", |html| html
+    ///         .subselect_once("div", |html| html
+    ///             .add_class("found")
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<div class="found">First</div>"#));
+    /// assert!(output.contains(r#"<div>Second</div>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn subselect_once<M, B, R>(self, selector: M, builder: B)
+    -> Api<'t, SubSelectAnyOnce<S, M::Selector, B>>
+    where
+        M: select::IntoSelector,
+        B: for<'tb> FnOnce(Api<'tb, modifier::select::BuildSubElementStream<S>>) -> Api<'tb, R>,
+        R: event::Stream,
+    {
+        Api::pack(modifier::Fallible::new(match selector.into_selector() {
+            Ok(selector) =>
+                Ok(modifier::select::SubSelectAnyOnce::new(self.stream, selector, builder)),
+            Err(error) => Err(error.into()),
+        }))
+    }
+
+    /// Apply transformation to all matching elements in the contents of the current element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div>
+    ///         <div>First</div>
+    ///         <div>Second</div>
+    ///     </div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("div", |html| html
+    ///         .subselect_direct("div", |html| html
+    ///             .add_class("found")
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<div class="found">First</div>"#));
+    /// assert!(output.contains(r#"<div class="found">Second</div>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn subselect_direct<M, B, R>(self, selector: M, builder: B)
     -> Api<'t, SubSelectDirect<S, M::Selector, B>>
     where
@@ -821,10 +1150,100 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         }))
     }
 
+    /// Apply transformation to the first matching direct child element in the contents of the
+    /// current element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div>
+    ///         <article><div>Lower</div></article>
+    ///         <div>First</div>
+    ///         <div>Second</div>
+    ///     </div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("div", |html| html
+    ///         .subselect_direct_once("div", |html| html
+    ///             .add_class("found")
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<div>Lower</div>"#));
+    /// assert!(output.contains(r#"<div class="found">First</div>"#));
+    /// assert!(output.contains(r#"<div>Second</div>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn subselect_direct_once<M, B, R>(self, selector: M, builder: B)
+    -> Api<'t, SubSelectDirectOnce<S, M::Selector, B>>
+    where
+        M: select::IntoSelector,
+        B: for<'tb> FnOnce(Api<'tb, modifier::select::BuildSubElementStream<S>>) -> Api<'tb, R>,
+        R: event::Stream,
+    {
+        Api::pack(modifier::Fallible::new(match selector.into_selector() {
+            Ok(selector) =>
+                Ok(modifier::select::SubSelectDirectOnce::new(self.stream, selector, builder)),
+            Err(error) => Err(error.into()),
+        }))
+    }
+
+    /// Remove the contents of the current element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <body>Some <em>content</em>.</body>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("body", |html| html.remove_contents())
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<body></body>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn remove_contents(self) -> Api<'t, modifier::remove::RemoveContent<S>> {
         Api::pack(modifier::remove::RemoveContent::new(self.stream))
     }
 
+    /// Prepend another stream to the contents of the current element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <head><title>Title</title></head>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("title", |html| html
+    ///         .prepend_contents("MyApp: ")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<title>MyApp: Title</title>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn prepend_contents<N>(self, stream: N)
     -> Api<'t, modifier::prepend::PrependContent<S, N::Stream>>
     where
@@ -833,6 +1252,29 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         Api::pack(modifier::prepend::PrependContent::new(self.stream, stream.into_stream()))
     }
 
+    /// Append another stream to the contents of the current element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <head><title>Title</title></head>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("title", |html| html
+    ///         .append_contents(" - MyApp")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<title>Title - MyApp</title>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn append_contents<N>(self, stream: N)
     -> Api<'t, modifier::append::AppendContent<S, N::Stream>>
     where
@@ -841,6 +1283,29 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         Api::pack(modifier::append::AppendContent::new(self.stream, stream.into_stream()))
     }
 
+    /// Replace the contents of the current element with another stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <head><title>Title</title></head>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("title", |html| html
+    ///         .replace_contents("New Title")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<title>New Title</title>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn replace_contents<N>(self, stream: N)
     -> Api<'t, modifier::replace::ReplaceContent<S, N::Stream>>
     where
@@ -849,6 +1314,33 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         Api::pack(modifier::replace::ReplaceContent::new(self.stream, stream.into_stream()))
     }
 
+    /// Repeat the contents of the current element for each item in an iterator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <ul><li>Item</li></ul>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("ul", |html| html
+    ///         .repeat_contents(2..4, |html, value| html
+    ///             .select_once("li", move |html| html
+    ///                 .replace_contents(value)
+    ///             )
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<li>2</li><li>3</li>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn repeat_contents<I, B, R>(self, iter: I, builder: B)
     -> Api<'t, modifier::repeat::RepeatContent<S, I::IntoIter, B>>
     where
@@ -859,6 +1351,33 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         Api::pack(modifier::repeat::RepeatContent::new(self.stream, iter.into_iter(), builder))
     }
 
+    /// Add an attribute to the current element.
+    ///
+    /// Existing attributes of the same name will be kept.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <a id="home-link">Home</a>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_once("a#home-link", |html| html
+    ///         .add_attribute("href", "http://example.com/")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<a id="home-link" href="http://example.com/">Home</a>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn add_attribute<N, V>(self, name: N, value: V)
     -> Api<'t, modifier::Fallible<modifier::attribute::AddAttribute<S>>>
     where
@@ -876,6 +1395,31 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
+    /// Add an attribute without a value.
+    ///
+    /// Existing attributes of the same name will be kept.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <input id="info">
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_once("input#info", |html| html
+    ///         .add_empty_attribute("disabled")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<input id="info" disabled>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn add_empty_attribute<N>(self, name: N)
     -> Api<'t, modifier::Fallible<modifier::attribute::AddAttribute<S>>>
     where
@@ -888,6 +1432,38 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
+    /// Add a value to an existing attribute.
+    ///
+    /// The value will only be added to the first occurence of the attribute. If none exists
+    /// yet, a new attribute with the passed value will be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div style="color: red">Foo</div>
+    ///     <div>Bar</div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("div", |html| html
+    ///         .add_to_attribute("style", "padding: 0", "; ")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<div style="color: red; padding: 0">Foo</div>"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<div style="padding: 0">Bar</div>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn add_to_attribute<N, V, J>(self, name: N, value: V, separator: J)
     -> Api<'t, modifier::Fallible<modifier::attribute::AddToAttribute<S>>>
     where
@@ -907,6 +1483,33 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
+    /// Replace existing attributes with a new one.
+    ///
+    /// If no existing attribute was found, no new attribute will be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <a href="foo.html">Foo</a>
+    ///     <a>Bar</a>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("a", |html| html
+    ///         .replace_attribute("href", "new.html")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<a href="new.html">Foo</a>"#));
+    /// assert!(output.contains(r#"<a>Bar</a>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn replace_attribute<N, V>(self, name: N, value: V)
     -> Api<'t, modifier::Fallible<modifier::attribute::ReplaceAttribute<S>>>
     where
@@ -924,6 +1527,34 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
+    /// Set an attribute to a specific value.
+    ///
+    /// All existing attributes with the same name will be removed. If no attribute with
+    /// the given name exists, one will still be added.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <a href="foo.html">Foo</a>
+    ///     <a>Bar</a>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("a", |html| html
+    ///         .set_attribute("href", "new.html")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<a href="new.html">Foo</a>"#));
+    /// assert!(output.contains(r#"<a href="new.html">Bar</a>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn set_attribute<N, V>(self, name: N, value: V)
     -> Api<'t, modifier::Fallible<modifier::attribute::SetAttribute<S>>>
     where
@@ -941,6 +1572,34 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
+    /// Set an attribute with the empty value.
+    ///
+    /// All existing attributes with the same name will be removed. If no attribute with
+    /// the given name exists, one will still be added.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <input name="one" disabled>
+    ///     <input name="two">
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("input", |html| html
+    ///         .set_empty_attribute("disabled")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<input name="one" disabled>"#));
+    /// assert!(output.contains(r#"<input name="two" disabled>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn set_empty_attribute<N>(self, name: N)
     -> Api<'t, modifier::Fallible<modifier::attribute::SetAttribute<S>>>
     where
@@ -953,6 +1612,29 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
+    /// Remove all attributes with a specific name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <input name="info" disabled>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("input", |html| html
+    ///         .remove_attribute("disabled")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<input name="info">"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn remove_attribute<N>(self, name: N)
     -> Api<'t, modifier::Fallible<modifier::attribute::RemoveAttribute<S>>>
     where
@@ -965,43 +1647,35 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
-    pub fn remove_class<N>(self, name: N)
-    -> Api<'t, modifier::Fallible<modifier::attribute::RemoveClass<S>>>
-    where
-        N: text::IntoIdentifier,
-    {
-        Api::pack(modifier::Fallible::new(
-            name.into_identifier()
-                .map(move |name| modifier::attribute::RemoveClass::new(self.stream, name))
-                .map_err(Into::into)
-        ))
-    }
-
-    pub fn remove_id(self)
-    -> Api<'t, modifier::attribute::RemoveAttribute<S>> {
-        Api::pack(modifier::attribute::RemoveAttribute::new(
-            self.stream,
-            text::Identifier::from_static_str("id").expect("remove_id attribute identifier"),
-        ))
-    }
-
-    pub fn set_id<N>(self, id: N)
-    -> Api<'t, modifier::Fallible<modifier::attribute::SetAttribute<S>>>
-    where
-        N: text::IntoIdentifier,
-    {
-        Api::pack(modifier::Fallible::new(
-            id.into_identifier()
-                .map(move |id| modifier::attribute::SetAttribute::new(
-                    self.stream,
-                    text::Identifier::from_static_str("id")
-                        .expect("remove_id attribute identifier"),
-                    Some(id.into_value()),
-                ))
-                .map_err(Into::into)
-        ))
-    }
-
+    /// Add a class to the element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <input id="one" class="required">
+    ///     <input id="two">
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("input", |html| html
+    ///         .add_class("field")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<input id="one" class="required field">"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<input id="two" class="field">"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
     pub fn add_class<N>(self, name: N)
     -> Api<'t, modifier::Fallible<modifier::attribute::AddToAttribute<S>>>
     where
@@ -1020,13 +1694,123 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         ))
     }
 
-    pub fn apply_as_boxed_element<B, R>(self, builder: B) -> Api<'t, R>
+    /// Remove a class from the element.
+    ///
+    /// The `class` element will be removed completely if there are no more classes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div id="one" class="warning">Foo</div>
+    ///     <div id="two" class="warning msg">Bar</div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("div", |html| html
+    ///         .remove_class("warning")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<div id="one">Foo</div>"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<div id="two" class="msg">Bar</div>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn remove_class<N>(self, name: N)
+    -> Api<'t, modifier::Fallible<modifier::attribute::RemoveClass<S>>>
     where
-        B: for<'tb> FnOnce(BoxedElementApi<'tb>) -> Api<'tb, R>,
-        R: event::Stream,
-        S: 'static,
+        N: text::IntoIdentifier,
     {
-        builder(self.into_boxed_element())
+        Api::pack(modifier::Fallible::new(
+            name.into_identifier()
+                .map(move |name| modifier::attribute::RemoveClass::new(self.stream, name))
+                .map_err(Into::into)
+        ))
+    }
+
+    /// Remove the ID attribute from the element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div id="foo">Foo</div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("#foo", |html| html
+    ///         // Remove the `id` attribute we just selected on.
+    ///         .remove_id()
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<div>Foo</div>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn remove_id(self)
+    -> Api<'t, modifier::attribute::RemoveAttribute<S>> {
+        Api::pack(modifier::attribute::RemoveAttribute::new(
+            self.stream,
+            text::Identifier::from_static_str("id").expect("remove_id attribute identifier"),
+        ))
+    }
+
+    /// Set the ID attribute of the element.
+    ///
+    /// An existing ID attribute will be overridden.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <p>Foo</p>
+    ///     <p>Bar</p>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_direct_once("p", |html| html
+    ///         .set_id("first-paragraph")
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<p id="first-paragraph">Foo</p>"#));
+    /// assert!(output.contains(r#"<p>Bar</p>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn set_id<N>(self, id: N)
+    -> Api<'t, modifier::Fallible<modifier::attribute::SetAttribute<S>>>
+    where
+        N: text::IntoIdentifier,
+    {
+        Api::pack(modifier::Fallible::new(
+            id.into_identifier()
+                .map(move |id| modifier::attribute::SetAttribute::new(
+                    self.stream,
+                    text::Identifier::from_static_str("id")
+                        .expect("remove_id attribute identifier"),
+                    Some(id.into_value()),
+                ))
+                .map_err(Into::into)
+        ))
     }
 }
 

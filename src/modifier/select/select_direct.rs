@@ -3,7 +3,7 @@ use event;
 use select;
 use builder;
 
-use super::{ Select, BuildElementStream, DirectOnly };
+use super::{ Select, SelectOnce, BuildElementStream, DirectOnly };
 
 /// Select a substream at the toplevel only.
 pub struct SelectDirect<S, M, B>
@@ -34,5 +34,61 @@ where
 {
     fn next_event(&mut self) -> event::StreamResult {
         self.select.next_event()
+    }
+}
+
+/// Select a substream at the toplevel only and only once.
+pub struct SelectDirectOnce<S, M, B>
+where
+    B: builder::BuildOnce<BuildElementStream<S>>,
+{
+    select: SelectOnce<S, M, B, DirectOnly>,
+}
+
+impl<S, M, B> SelectDirectOnce<S, M, B>
+where
+    M: select::Selector,
+    S: event::Stream,
+    B: builder::BuildOnce<BuildElementStream<S>>,
+{
+    pub(crate) fn new(stream: S, matcher: M, builder: B) -> SelectDirectOnce<S, M, B> {
+        SelectDirectOnce {
+            select: SelectOnce::new(stream, matcher, builder, DirectOnly),
+        }
+    }
+}
+
+impl<S, M, B> event::Stream for SelectDirectOnce<S, M, B>
+where
+    M: select::Selector,
+    S: event::Stream,
+    B: builder::BuildOnce<BuildElementStream<S>>,
+{
+    fn next_event(&mut self) -> event::StreamResult {
+        self.select.next_event()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn select_direct() {
+        test_transform!(
+            Default::default(),
+            "<p><b>23</b></p><b>45</b><b>67</b>",
+            "<p><b>23</b></p><b>4599</b><b>6799</b>",
+            |html| html.select_direct("b", |html| html.append_contents(99)),
+        );
+    }
+
+    #[test]
+    fn select_direct_once() {
+        test_transform!(
+            Default::default(),
+            "<p><b>23</b></p><b>45</b><b>67</b>",
+            "<p><b>23</b></p><b>4599</b><b>67</b>",
+            |html| html.select_direct_once("b", |html| html.append_contents(99)),
+        );
     }
 }

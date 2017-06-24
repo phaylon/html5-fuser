@@ -18,11 +18,11 @@ pub(crate) mod subselect_any;
 pub(crate) mod subselect_direct;
 
 pub use self::element::{ SingleElement };
-pub use self::select_any::{ SelectAny };
-pub use self::select_direct::{ SelectDirect };
+pub use self::select_any::{ SelectAny, SelectAnyOnce };
+pub use self::select_direct::{ SelectDirect, SelectDirectOnce };
 pub use self::select_contents::{ SelectContent, CurrentContent };
-pub use self::subselect_any::{ SubSelectAny };
-pub use self::subselect_direct::{ SubSelectDirect };
+pub use self::subselect_any::{ SubSelectAny, SubSelectAnyOnce };
+pub use self::subselect_direct::{ SubSelectDirect, SubSelectDirectOnce };
 
 type Shared<S> = rc::Rc<cell::RefCell<S>>;
 
@@ -50,6 +50,105 @@ impl Restrict for NoRestriction {
 pub(crate) type BuildElementStream<S> = element::SingleElement<Shared<S>>;
 
 pub(crate) type BuildSubElementStream<S> = BuildElementStream<CurrentContent<S>>;
+
+struct SelectOnce<S, M, B, R>
+where
+    B: builder::BuildOnce<BuildElementStream<S>>
+{
+    source: Shared<S>,
+    state: modifier::State<SelectOnceState<S, M, B, R>>,
+}
+
+impl<S, M, B, R> SelectOnce<S, M, B, R>
+where
+    M: select::Selector,
+    S: event::Stream,
+    B: builder::BuildOnce<BuildElementStream<S>>,
+    R: Restrict,
+{
+    fn new(source: S, matcher: M, builder: B, restriction: R) -> SelectOnce<S, M, B, R> {
+        SelectOnce {
+            source: rc::Rc::new(cell::RefCell::new(source)),
+            state: modifier::State::new(SelectOnceState::Scanning {
+                matcher,
+                builder,
+                restriction,
+                level: modifier::Level::new(),
+            }),
+        }
+    }
+}
+
+impl<S, M, B, R> event::ElementStream for SelectOnce<S, M, B, R>
+where
+    M: select::Selector,
+    S: event::Stream,
+    B: builder::BuildOnce<BuildElementStream<S>>,
+    R: Restrict,
+    B::Stream: event::ElementStream,
+{}
+
+impl<S, M, B, R> event::Stream for SelectOnce<S, M, B, R>
+where
+    S: event::Stream,
+    M: select::Selector,
+    B: builder::BuildOnce<BuildElementStream<S>>,
+    R: Restrict,
+{
+    fn next_event(&mut self) -> event::StreamResult {
+        let SelectOnce {
+            ref mut state,
+            ref mut source,
+        } = *self;
+        state.step(|state| match state {
+            SelectOnceState::Scanning { level, matcher, builder, restriction } => {
+                let event = match source.next_event_skip_noop()? {
+                    Some(event) => event,
+                    None => return Ok(None),
+                };
+                if restriction.include(&level) && matcher.matches(&event) {
+                    let element = SingleElement::new(source.clone(), event);
+                    let new_stream = transform::build_once(element, builder);
+                    let state = SelectOnceState::Active { stream: new_stream };
+                    Ok(Some((event::noop(), Some(state))))
+                } else {
+                    let new_level = level.adjust(&event)?;
+                    let state = SelectOnceState::Scanning {
+                        matcher,
+                        builder,
+                        restriction,
+                        level: new_level,
+                    };
+                    Ok(Some((event, Some(state))))
+                }
+            },
+            SelectOnceState::Active { mut stream } => match stream.next_event()? {
+                None => Ok(Some((event::noop(), Some(SelectOnceState::Passthrough)))),
+                Some(event) => Ok(Some((event, Some(SelectOnceState::Active { stream })))),
+            },
+            SelectOnceState::Passthrough => match source.next_event()? {
+                Some(event) => Ok(Some((event, Some(SelectOnceState::Passthrough)))),
+                None => Ok(None),
+            },
+        })
+    }
+}
+
+enum SelectOnceState<S, M, B, R>
+where
+    B: builder::BuildOnce<BuildElementStream<S>>
+{
+    Scanning {
+        matcher: M,
+        builder: B,
+        restriction: R,
+        level: modifier::Level,
+    },
+    Active {
+        stream: B::Stream,
+    },
+    Passthrough,
+}
 
 #[derive(Debug)]
 struct Select<S, M, B, R> where B: builder::BuildMut<BuildElementStream<S>> {
@@ -108,7 +207,6 @@ where
                     Some(event) => event,
                     None => return Ok(None),
                 };
-                //if restriction.include(&level) && matches_event(matcher, &event) {
                 if restriction.include(&level) && matcher.matches(&event) {
                     let element = SingleElement::new(source.clone(), event);
                     let new_stream = transform::build_mut(element, builder);
