@@ -426,23 +426,44 @@ mod tests {
         ),
     );
 
-    test_group!(add_attribute:
+    test_group!(add_attribute_with_value:
         "add to existing" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a foo=\"bar\" baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html.select("a", |html| html.add_attribute("foo", "newval")),
+            |html| html.select("a", |html| html.add_attribute_with_value("foo", "newval")),
         ),
         "add new" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo=\"newval\">23</a>",
-            |html| html.select("a", |html| html.add_attribute("foo", "newval")),
+            |html| html.select("a", |html| html.add_attribute_with_value("foo", "newval")),
         ),
         "ensure element stream" => transform_test!(
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo=\"newval\" foo=\"newval2\">23</a>",
             |html| html.select("a", |html| html
-                .add_attribute("foo", "newval")
-                .add_attribute("foo", "newval2")
+                .add_attribute_with_value("foo", "newval")
+                .add_attribute_with_value("foo", "newval2")
+            ),
+        ),
+    );
+
+    test_group!(add_attribute:
+        "add to existing" => transform_test!(
+            "<a foo=\"bar\" baz=\"qux\">23</a>",
+            "<a foo=\"bar\" baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html.add_attribute("foo", Some("newval"))),
+        ),
+        "add new" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\">23</a>",
+            |html| html.select("a", |html| html.add_attribute("foo", Some("newval"))),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a baz=\"qux\">23</a>",
+            "<a baz=\"qux\" foo=\"newval\" foo=\"newval2\">23</a>",
+            |html| html.select("a", |html| html
+                .add_attribute("foo", Some("newval"))
+                .add_attribute("foo", Some("newval2"))
             ),
         ),
     );

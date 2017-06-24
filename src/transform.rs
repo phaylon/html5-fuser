@@ -1368,7 +1368,7 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
     ///
     /// let output = format!("{}", template.transform(|html| html
     ///     .select_once("a#home-link", |html| html
-    ///         .add_attribute("href", "http://example.com/")
+    ///         .add_attribute_with_value("href", "http://example.com/")
     ///     )
     /// )?);
     ///
@@ -1378,7 +1378,43 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
     /// # Ok(()) }
     /// # fn main() { run().unwrap() }
     /// ```
-    pub fn add_attribute<N, V>(self, name: N, value: V)
+    pub fn add_attribute_with_value<N, V>(self, name: N, value: V)
+    -> Api<'t, modifier::Fallible<modifier::attribute::AddAttribute<S>>>
+    where
+        N: text::IntoIdentifier,
+        V: text::IntoValue,
+    {
+        self.add_attribute(name, Some(value))
+    }
+
+    /// Add an optional attribute to the current element.
+    ///
+    /// Existing attributes of the same name will be kept.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <a id="home-link">Home</a>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_once("a#home-link", |html| html
+    ///         .add_attribute("href", Some("http://example.com/"))
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<a id="home-link" href="http://example.com/">Home</a>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn add_attribute<N, V>(self, name: N, value: Option<V>)
     -> Api<'t, modifier::Fallible<modifier::attribute::AddAttribute<S>>>
     where
         N: text::IntoIdentifier,
@@ -1389,7 +1425,7 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
                 .map(move |name| modifier::attribute::AddAttribute::new(
                     self.stream,
                     name,
-                    Some(value.into_value()),
+                    value.map(text::IntoValue::into_value),
                 ))
                 .map_err(Into::into)
         ))
