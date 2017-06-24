@@ -401,9 +401,14 @@ mod tests {
     );
 
     test_group!(add_to_attribute:
-        "add to existing" => transform_test!(
+        "add to existing with value" => transform_test!(
             "<a foo=\"bar\" baz=\"qux\">23</a>",
             "<a foo=\"bar:newval\" baz=\"qux\">23</a>",
+            |html| html.select("a", |html| html.add_to_attribute("foo", "newval", ":")),
+        ),
+        "add to existing empty" => transform_test!(
+            "<a foo baz=\"qux\">23</a>",
+            "<a foo=\"newval\" baz=\"qux\">23</a>",
             |html| html.select("a", |html| html.add_to_attribute("foo", "newval", ":")),
         ),
         "add new" => transform_test!(
