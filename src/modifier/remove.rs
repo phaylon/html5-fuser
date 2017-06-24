@@ -73,6 +73,11 @@ mod tests {
             "<a><b></b>45<c>67</c><b></b></a>",
             |html| html.select("b", |html| html.remove_contents()),
         ),
+        "ensure element stream" => transform_test!(
+            "<a><b>23</b>45<c>67</c><b>89</b></a>",
+            "<a><b></b>45<c>67</c><b></b></a>",
+            |html| html.select("b", |html| html.remove_contents().into_boxed_element()),
+        ),
     );
 
     test_group!(remove:
