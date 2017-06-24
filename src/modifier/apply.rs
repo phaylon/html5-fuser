@@ -116,6 +116,14 @@ mod tests {
             "<a><b></b></a>",
             |html| html.select("b", |html| html.apply(|html| html.remove_contents())),
         ),
+        "ensure element streams" => transform_test!(
+            "<link>",
+            "<link>",
+            |html| html.select("link", |html| html
+                .apply(|html| html.into_boxed_element())
+                .into_boxed_element()
+            ),
+        ),
     );
 
     test_group!(apply_if_else:
@@ -137,6 +145,18 @@ mod tests {
                 |html| html.replace_contents("33"),
             )),
         ),
+        "element stream if both are element streams" => transform_test!(
+            "<link>",
+            "<link>",
+            |html| html.select("link", |html| html
+                .apply_if_else(
+                    true,
+                    |html| html.into_boxed_element(),
+                    |html| html.into_boxed_element(),
+                )
+                .into_boxed_element()
+            ),
+        ),
     );
 
     test_group!(apply_if:
@@ -152,6 +172,17 @@ mod tests {
             "<a><b>23</b></a>",
             |html| html.select("b", |html| html
                 .apply_if(false, |html| html.replace_contents("99"))
+            ),
+        ),
+        "element stream if both are element streams" => transform_test!(
+            "<link>",
+            "<link>",
+            |html| html.select("link", |html| html
+                .apply_if(
+                    true,
+                    |html| html.into_boxed_element(),
+                )
+                .into_boxed_element()
             ),
         ),
     );
