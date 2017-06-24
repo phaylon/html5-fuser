@@ -89,35 +89,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
-    #[test]
-    fn prepend_contents() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+    test_group!(prepend_contents:
+        "prepend to existing" => transform_test!(
             "<a><b>23</b><c>42</c><b>93</b></a>",
-            "<a><b>23</b><c><i>foo</i>42</c><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("c").unwrap(), |html| html
-                    .prepend_contents(&new_template)
-                )
-        );
-    }
+            "<a><b>23</b><c>foo42</c><b>93</b></a>",
+            |html| html.select("c", |html| html.prepend_contents("foo")),
+        ),
+        "prepend to existing" => transform_test!(
+            "<a><b>23</b><c></c><b>93</b></a>",
+            "<a><b>23</b><c>foo</c><b>93</b></a>",
+            |html| html.select("c", |html| html.prepend_contents("foo")),
+        ),
+    );
 
-    #[test]
-    fn prepend() {
-        let new = "<i>foo</i>";
-        let new_template = ::Template::from_str(new, Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+    test_group!(prepend:
+        "prepend" => transform_test!(
             "<a><b>23</b><c>42</c><b>93</b></a>",
-            "<a><b>23</b><i>foo</i><c>42</c><b>93</b></a>",
-            |html| html
-                .select(::select::Tag::from_str("c").unwrap(), |html| html
-                    .prepend(&new_template)
-                )
-        );
-    }
+            "<a><b>23</b>foo<c>42</c><b>93</b></a>",
+            |html| html.select("c", |html| html.prepend("foo")),
+        ),
+    );
 }
