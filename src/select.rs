@@ -137,13 +137,13 @@ impl From<IdError> for event::StreamError {
 /// let output = format!("{}", template.transform(|html| html
 ///     // Using a preconstructed id selector.
 ///     .select(home_id, |html| html
-///         .set_attribute_value("href", "index.html")
+///         .set_attribute_with_value("href", "index.html")
 ///     )
 ///     // Using a id selector construction result.
 ///     // A selector error like an invalid identifier
 ///     // will emit a stream error.
 ///     .select(Id::from_str("contact-link"), |html| html
-///         .set_attribute_value("href", "contact.html")
+///         .set_attribute_with_value("href", "contact.html")
 ///     )
 /// )?);
 ///
@@ -355,13 +355,13 @@ impl From<ClassError> for event::StreamError {
 /// let output = format!("{}", template.transform(|html| html
 ///     // Using a preconstructed class selector.
 ///     .select(home_class, |html| html
-///         .set_attribute_value("href", "index.html")
+///         .set_attribute_with_value("href", "index.html")
 ///     )
 ///     // Using a class selector construction result.
 ///     // A selector error like an invalid identifier
 ///     // will emit a stream error.
 ///     .select(Class::from_str("contact-link"), |html| html
-///         .set_attribute_value("href", "contact.html")
+///         .set_attribute_with_value("href", "contact.html")
 ///     )
 /// )?);
 ///
@@ -469,7 +469,7 @@ impl From<ClassesError> for event::StreamError {
 /// let output = format!("{}", template.transform(|html| html
 ///     // Using a preconstructed classes selector.
 ///     .select(home_classes, |html| html
-///         .set_attribute_value("href", "index.html")
+///         .set_attribute_with_value("href", "index.html")
 ///     )
 ///     // Using a classes selector construction result.
 ///     // A selector error like an invalid identifier
@@ -478,7 +478,7 @@ impl From<ClassesError> for event::StreamError {
 ///         Classes::from_str_iterator(
 ///             "navlink contact".split_whitespace()
 ///         ),
-///         |html| html.set_attribute_value("href", "contact.html"),
+///         |html| html.set_attribute_with_value("href", "contact.html"),
 ///     )
 /// )?);
 ///
