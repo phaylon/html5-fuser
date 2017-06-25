@@ -13,6 +13,8 @@ use event;
 use parse;
 use transform;
 use text;
+use modifier;
+use select;
 
 /// Invalid input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -280,6 +282,57 @@ impl Template {
         events.push(event);
         let events = rc::Rc::new(events);
         Ok(Template { events })
+    }
+
+    /// Create a template with a single empty element and transform it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions };
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <body></body>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select_once("body", |html| html
+    ///         .replace_contents(
+    ///             Template::with_transformed_element("a", |html| html
+    ///                 .set_attribute_with_value("href", "index.html")
+    ///                 .replace_contents("Home")
+    ///             )
+    ///         )
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<body><a href="index.html">Home</a></body>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn with_transformed_element<T, B, R>(
+        tag: T,
+        builder: B,
+    ) -> Result<Template, event::StreamError>
+    where
+        T: text::IntoIdentifier,
+        B: for<'tb> FnOnce(
+                transform::Api<'tb,modifier::select::BuildElementStream<TemplateStream>>
+            ) -> transform::Api<'tb, R>,
+        R: event::Stream,
+    {
+        let tag = tag.into_identifier()?;
+        Template::with_element(tag.clone())
+            .map_err(Into::into)
+            .and_then(move |template| template
+                .transform(move |html| html
+                    .select_once(select::Tag::from_identifier(tag), builder)
+                )
+            )
     }
 
     pub(crate) fn to_stream(&self) -> TemplateStream {

@@ -268,6 +268,13 @@ pub struct Tag {
     identifier: text::Identifier,
 }
 
+impl Tag {
+
+    pub(crate) fn from_identifier(identifier: text::Identifier) -> Tag {
+        Tag { identifier }
+    }
+}
+
 impl str::FromStr for Tag {
 
     type Err = TagError;
