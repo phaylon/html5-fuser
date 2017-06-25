@@ -242,19 +242,6 @@ mod tests {
     use std::str::{ FromStr };
 
     #[test]
-    fn select_direct() {
-        test_transform!(
-            Default::default(),
-            "<a><b>23</b></a><b>47</b>",
-            "<a><b>23</b></a><b>99</b>",
-            |html| html
-                .select_direct(::select::Tag::from_str("b").unwrap(), |html| html
-                    .replace_contents("99")
-                )
-        );
-    }
-
-    #[test]
     fn select_roundtrip() {
         let original = "<a><b><c><b>foo</b></c></b></a>";
         test_transform!(

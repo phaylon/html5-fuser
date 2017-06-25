@@ -72,23 +72,29 @@ where
 #[cfg(test)]
 mod tests {
 
-    #[test]
-    fn select_direct() {
-        test_transform!(
-            Default::default(),
+    test_group!(select_direct:
+        "match all direct" => transform_test!(
             "<p><b>23</b></p><b>45</b><b>67</b>",
             "<p><b>23</b></p><b>4599</b><b>6799</b>",
             |html| html.select_direct("b", |html| html.append_contents(99)),
-        );
-    }
+        ),
+        "ensure_element_stream" => transform_test!(
+            "<b />",
+            "<b />",
+            |html| html.select_direct("b", |html| html.into_boxed_element()),
+        ),
+    );
 
-    #[test]
-    fn select_direct_once() {
-        test_transform!(
-            Default::default(),
+    test_group!(select_direct_once:
+        "match first" => transform_test!(
             "<p><b>23</b></p><b>45</b><b>67</b>",
             "<p><b>23</b></p><b>4599</b><b>67</b>",
             |html| html.select_direct_once("b", |html| html.append_contents(99)),
-        );
-    }
+        ),
+        "ensure_element_stream" => transform_test!(
+            "<b />",
+            "<b />",
+            |html| html.select_direct_once("b", |html| html.into_boxed_element()),
+        ),
+    );
 }
