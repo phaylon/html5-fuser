@@ -241,6 +241,11 @@ mod tests {
             "<a class=\"baz\">23</a>",
             |html| html.select("a", |html| html.add_class("baz").into_boxed_element()),
         ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.add_class("")),
+        ),
     );
 
     test_group!(remove_class:
@@ -259,6 +264,11 @@ mod tests {
             "<a class=\"baz\" id=\"xyz\">23</a>",
             |html| html.select("a", |html| html.remove_class("bar").into_boxed_element()),
         ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.remove_class("")),
+        ),
     );
 
     test_group!(set_id:
@@ -276,6 +286,11 @@ mod tests {
             "<link class=\"bar\">",
             "<link class=\"bar\" id=\"qux\">",
             |html| html.select("link", |html| html.set_id("qux").into_boxed_element()),
+        ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.set_id("")),
         ),
     );
 
@@ -303,6 +318,11 @@ mod tests {
             "<a baz=\"qux\">23</a>",
             |html| html.select("a", |html| html.remove_attribute("foo").into_boxed_element()),
         ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.remove_attribute("")),
+        ),
     );
 
     test_group!(set_attribute:
@@ -323,6 +343,11 @@ mod tests {
                 .set_attribute("foo", Some("newval"))
                 .into_boxed_element()
             ),
+        ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.set_attribute("", Some(""))),
         ),
     );
 
@@ -345,6 +370,11 @@ mod tests {
                 .into_boxed_element()
             ),
         ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.set_attribute_with_value("", "")),
+        ),
     );
 
     test_group!(set_empty_attribute:
@@ -362,6 +392,11 @@ mod tests {
             "<a baz=\"qux\">23</a>",
             "<a baz=\"qux\" foo>23</a>",
             |html| html.select("a", |html| html.set_empty_attribute("foo").into_boxed_element()),
+        ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.set_empty_attribute("")),
         ),
     );
 
@@ -395,6 +430,11 @@ mod tests {
                 .into_boxed_element()
             ),
         ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.replace_attribute_value_if_exists("", "")),
+        ),
     );
 
     test_group!(add_to_attribute:
@@ -421,6 +461,11 @@ mod tests {
                 .into_boxed_element()
             ),
         ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.add_to_attribute("", "", "")),
+        ),
     );
 
     test_group!(add_attribute_with_value:
@@ -441,6 +486,11 @@ mod tests {
                 .add_attribute_with_value("foo", "newval")
                 .into_boxed_element()
             ),
+        ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.add_attribute_with_value("", "")),
         ),
     );
 
@@ -463,6 +513,11 @@ mod tests {
                 .into_boxed_element()
             ),
         ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.add_attribute("", Some(""))),
+        ),
     );
 
     test_group!(add_empty_attribute:
@@ -483,6 +538,11 @@ mod tests {
                 .add_empty_attribute("foo")
                 .into_boxed_element()
             ),
+        ),
+        "identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.add_empty_attribute("")),
         ),
     );
 
