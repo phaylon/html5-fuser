@@ -239,16 +239,12 @@ enum SelectState<O> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
-    #[test]
-    fn select_roundtrip() {
-        let original = "<a><b><c><b>foo</b></c></b></a>";
-        test_transform!(
-            Default::default(),
-            original,
-            original,
-            |html| html.select(::select::Tag::from_str("b").unwrap(), |elem| elem)
-        );
-    }
+    test_group!(select_roundtrip:
+        "roundtrip" => transform_test!(
+            "<a><b><c><b>foo</b></c></b></a>",
+            "<a><b><c><b>foo</b></c></b></a>",
+            |html| html.select("b", |elem| elem),
+        ),
+    );
 }
