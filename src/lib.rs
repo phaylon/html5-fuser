@@ -93,29 +93,6 @@ macro_rules! transform_error_test {
     }
 }
 
-#[cfg(test)]
-macro_rules! test_transform {
-    ($options:expr, $input:expr, $expected:expr, $transform:expr $(,)*) => {{
-        let template = ::Template::from_str($input, $options).unwrap();
-        let modified = template.transform($transform).unwrap();
-        let rendered = format!("{}", &modified);
-        assert_eq!(rendered, $expected);
-        modified
-    }}
-}
-
-#[cfg(test)]
-macro_rules! test_stream_error {
-    ($options:expr, $input:expr, $expected:pat, $transform:expr $(,)*) => {{
-        let template = ::Template::from_str($input, $options).unwrap();
-        let result = template.transform($transform);
-        if let Err($expected) = result {
-        } else {
-            panic!("invalid result: {:?}", result);
-        }
-    }}
-}
-
 mod input;
 pub mod content;
 pub mod builder;
