@@ -385,4 +385,24 @@ mod tests {
         "empty" => transform_test!("", "", |html| html),
         "data only" => transform_test!("foo", "foo", |html| html),
     );
+
+    #[test]
+    fn template_errors() {
+        match ::Template::from_str("12345", ::ParseOptions::default().max_input_len(4)) {
+            Err(super::InputError::LengthLimitExceeded { limit: 4 }) => (),
+            other => panic!("different error than expected: {:?}", other),
+        }
+        let content = "<a><b><c></c></b></a>";
+        match ::Template::from_str(content, ::ParseOptions::default().max_stack_depth(2)) {
+            Err(super::InputError::Parse {
+                error: ::parse::Error::StackLimitExceeded {
+                    location: _,
+                    limit: 2,
+                    tag,
+                },
+            }) => assert_eq!(&tag, "c"),
+            Err(other) => panic!("different error than expected: {:#?}", other),
+            Ok(_) => panic!("not an error"),
+        }
+    }
 }
