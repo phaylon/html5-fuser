@@ -281,36 +281,6 @@ mod tests {
     }
 
     #[test]
-    fn subselect() {
-        test_transform!(
-            Default::default(),
-            "<a><a><a>23</a></a></a>",
-            "<a><a><a>99</a></a></a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .subselect(::select::Tag::from_str("a").unwrap(), |html| html
-                        .subselect(::select::Tag::from_str("a").unwrap(), |html| html
-                            .replace_contents("99")                            
-                        )
-                    )
-                )
-        );
-        test_transform!(
-            Default::default(),
-            "<a><a>23</a></a>",
-            "<a><a>23</a></a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .subselect(::select::Tag::from_str("a").unwrap(), |html| html
-                        .subselect(::select::Tag::from_str("a").unwrap(), |html| html
-                            .replace_contents("99")                            
-                        )
-                    )
-                )
-        );
-    }
-
-    #[test]
     fn select_contents() {
         test_transform!(
             Default::default(),

@@ -135,35 +135,58 @@ where
 #[cfg(test)]
 mod tests {
 
-    #[test]
-    fn subselect() {
-        test_transform!(
-            Default::default(),
+    test_group!(subselect:
+        "2 levels append" => transform_test!(
             "<b><b>23</b></b><b>45</b>",
             "<b><b>2399</b></b><b>45</b>",
             |html| html.select("b", |html| html
                 .subselect("b", |html| html.append_contents(99)),
             ),
-        );
-    }
+        ),
+        "ensure element stream" => transform_test!(
+            "<b><b>23</b></b><b>45</b>",
+            "<b><b>2399</b></b><b>45</b>",
+            |html| html.select("b", |html| html
+                .subselect("b", |html| html.append_contents(99).into_boxed_element()),
+            ),
+        ),
+        "three levels match" => transform_test!(
+            "<a><a><a>23</a></a></a>",
+            "<a><a><a>99</a></a></a>",
+            |html| html.select("a", |html| html.subselect("a", |html| html
+                .subselect("a", |html| html.replace_contents("99"))
+            )),
+        ),
+        "three levels non-match" => transform_test!(
+            "<a><a>23</a></a>",
+            "<a><a>23</a></a>",
+            |html| html.select("a", |html| html.subselect("a", |html| html
+                .subselect("a", |html| html.replace_contents("99"))
+            )),
+        ),
+    );
 
-    #[test]
-    fn subselect_once() {
-        test_transform!(
-            Default::default(),
+    test_group!(subselect_once:
+        "below select_once" => transform_test!(
             "<b><b>23</b><b>45</b></b><b>67<b>89</b></b>",
             "<b><b>2399</b><b>45</b></b><b>67<b>89</b></b>",
             |html| html.select_once("b", |html| html
                 .subselect_once("b", |html| html.append_contents(99)),
             ),
-        );
-        test_transform!(
-            Default::default(),
+        ),
+        "below select" => transform_test!(
             "<b><b>23</b><b>45</b></b><b>67<b>89</b></b>",
             "<b><b>2399</b><b>45</b></b><b>67<b>8999</b></b>",
             |html| html.select("b", |html| html
                 .subselect_once("b", |html| html.append_contents(99)),
             ),
-        );
-    }
+        ),
+        "ensure element stream" => transform_test!(
+            "<b><b>23</b><b>45</b></b><b>67<b>89</b></b>",
+            "<b><b>2399</b><b>45</b></b><b>67<b>8999</b></b>",
+            |html| html.select("b", |html| html
+                .subselect_once("b", |html| html.append_contents(99).into_boxed_element()),
+            ),
+        ),
+    );
 }
