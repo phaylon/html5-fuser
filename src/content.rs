@@ -43,15 +43,6 @@ impl<'a> event::IntoStream for &'a text::Data {
     }
 }
 
-impl event::IntoStream for String {
-
-    type Stream = Stream;
-
-    fn into_stream(self) -> Self::Stream {
-        Stream { data: Some(text::Data::from_unencoded_str(&self)) }
-    }
-}
-
 impl event::IntoStream for &'static str {
 
     type Stream = Stream;

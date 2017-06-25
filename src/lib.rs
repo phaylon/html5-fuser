@@ -23,6 +23,7 @@
 //! # use std::error;
 //! # fn example() -> Result<(), Box<error::Error>> {
 //! use html5_fuser::{ Template, ParseOptions };
+//! use html5_fuser::text::{ Data };
 //!
 //! let template = Template::from_str(r#"
 //!     <html>
@@ -39,7 +40,9 @@
 //!     .select("title", |html| html.replace_contents("New Title"))
 //!     .select("#items", |html| html
 //!         .repeat(2..5, |html, value| html
-//!             .replace_contents(format!("Item {}", value))
+//!             .replace_contents(
+//!                 Data::from_unencoded_str(&format!("Item {}", value))
+//!             )
 //!         )
 //!     )
 //! )?;
