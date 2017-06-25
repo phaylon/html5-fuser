@@ -807,15 +807,43 @@ mod tests {
             "<a><b></b></a>",
             |html| html.select("b", |html| html.remove_contents()),
         ),
+        "tag identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::StaticSelector {
+                error: super::StaticError::Tag {
+                    error: ::text::IdentifierError::Forbidden { forbidden: '/' },
+                },
+            },
+            |html| html.select("/", |html| html),
+        ),
         "id" => transform_test!(
             "<a><b id=\"x\">23</b><b id=\"y\">45</b></a>",
             "<a><b id=\"x\">23</b><b id=\"y\"></b></a>",
             |html| html.select("#y", |html| html.remove_contents()),
         ),
+        "id identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::StaticSelector {
+                error: super::StaticError::Id {
+                    error: ::text::IdentifierError::Forbidden { forbidden: '/' },
+                },
+            },
+            |html| html.select("#/", |html| html),
+        ),
         "class" => transform_test!(
             "<a><b class=\"w x\">23</b><b class=\"y z\">45</b></a>",
             "<a><b class=\"w x\">23</b><b class=\"y z\"></b></a>",
             |html| html.select(".y", |html| html.remove_contents()),
+        ),
+        "class identifier error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::StaticSelector {
+                error: super::StaticError::Class {
+                    index: 2,
+                    error: ::text::IdentifierError::Forbidden { forbidden: '/' },
+                },
+            },
+            |html| html.select(".x.y./", |html| html),
         ),
         "multiple classes" => transform_test!(
             "<a><b class=\"x y\">23</b><b class=\"y z\">45</b></a>",
@@ -831,6 +859,13 @@ mod tests {
             "<a>A</a><a id=\"x\">B</a><a class=\"y z\">C</a><a id=\"x\" class=\"y z\">D</a>",
             "<a>A</a><a id=\"x\">B</a><a class=\"y z\">C</a><a id=\"x\" class=\"y z\"></a>",
             |html| html.select("a#x.z.y", |html| html.remove_contents()),
+        ),
+        "unrestricted error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::StaticSelector {
+                error: super::StaticError::Unrestricted,
+            },
+            |html| html.select("", |html| html),
         ),
     );
 
