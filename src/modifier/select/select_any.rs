@@ -72,23 +72,29 @@ where
 #[cfg(test)]
 mod tests {
 
-    #[test]
-    fn select() {
-        test_transform!(
-            Default::default(),
+    test_group!(select:
+        "select all" => transform_test!(
             "<p><b>23</b></p><b>45</b>",
             "<p><b>2399</b></p><b>4599</b>",
             |html| html.select("b", |html| html.append_contents(99)),
-        );
-    }
+        ),
+        "ensure element stream" => transform_test!(
+            "<b />",
+            "<b />",
+            |html| html.select("b", |html| html.into_boxed_element()),
+        ),
+    );
 
-    #[test]
-    fn select_once() {
-        test_transform!(
-            Default::default(),
+    test_group!(select_once:
+        "select first" => transform_test!(
             "<p><b>23</b></p><b>45</b>",
             "<p><b>2399</b></p><b>45</b>",
             |html| html.select_once("b", |html| html.append_contents(99)),
-        );
-    }
+        ),
+        "ensure element stream" => transform_test!(
+            "<b />",
+            "<b />",
+            |html| html.select_once("b", |html| html.into_boxed_element()),
+        ),
+    );
 }
