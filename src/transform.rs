@@ -1889,77 +1889,44 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
 
-    #[test]
-    fn apply_as_boxed_element() {
+    fn map_boxed_elem(api: ::BoxedElementApi) -> ::BoxedElementApi {
+        api.remove_contents().into_boxed_element()
+    }
 
-        fn map_boxed_elem(api: ::BoxedElementApi) -> ::BoxedElementApi {
-            api.remove_contents().into_boxed_element()
-        }
+    fn map_boxed(api: ::BoxedApi) -> ::BoxedApi {
+        api.remove().into_boxed()
+    }
 
-        test_transform!(
-            Default::default(),
+    test_group!(apply_as_boxed_element:
+        "function map" => transform_test!(
             "<a>01<b>23</b>45</a>",
             "<a>01<b></b>45</a>",
-            |html| html
-                .select(::select::Tag::from_str("b"), |html|
-                    html.apply_as_boxed_element(map_boxed_elem)
-                )
-        );
-    }
+            |html| html.select("b", |html| html.apply_as_boxed_element(map_boxed_elem)),
+        ),
+    );
 
-    #[test]
-    fn into_boxed_element() {
-
-        fn map_boxed_elem(api: ::BoxedElementApi) -> ::BoxedElementApi {
-            api.remove_contents().into_boxed_element()
-        }
-
-        test_transform!(
-            Default::default(),
+    test_group!(into_boxed_element:
+        "function map" => transform_test!(
             "<a>01<b>23</b>45</a>",
             "<a>01<b></b>45</a>",
-            |html| html
-                .select(::select::Tag::from_str("b"), |html|
-                    map_boxed_elem(html.into_boxed_element())
-                )
-        );
-    }
+            |html| html.select("b", |html| map_boxed_elem(html.into_boxed_element())),
+        ),
+    );
 
-    #[test]
-    fn apply_as_boxed() {
-
-        fn map_boxed(api: ::BoxedApi) -> ::BoxedApi {
-            api.remove().into_boxed()
-        }
-
-        test_transform!(
-            Default::default(),
+    test_group!(apply_as_boxed:
+        "function map" => transform_test!(
             "<a>01<b>23</b>45</a>",
             "<a>0145</a>",
-            |html| html
-                .select(::select::Tag::from_str("b"), |html|
-                    html.apply_as_boxed(map_boxed)
-                )
-        );
-    }
+            |html| html.select("b", |html| html.apply_as_boxed(map_boxed)),
+        ),
+    );
 
-    #[test]
-    fn into_boxed() {
-
-        fn map_boxed(api: ::BoxedApi) -> ::BoxedApi {
-            api.remove().into_boxed()
-        }
-
-        test_transform!(
-            Default::default(),
+    test_group!(into_boxed:
+        "function map" => transform_test!(
             "<a>01<b>23</b>45</a>",
             "<a>0145</a>",
-            |html| html
-                .select(::select::Tag::from_str("b"), |html|
-                    map_boxed(html.into_boxed())
-                )
-        );
-    }
+            |html| html.select("b", |html| map_boxed(html.into_boxed())),
+        ),
+    );
 }
