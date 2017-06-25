@@ -177,11 +177,19 @@ struct CurrentContentState<S> {
 #[cfg(test)]
 mod tests {
 
-    test_group!(select_contents:
+    test_group!(subselect_contents:
         "remove" => transform_test!(
             "<a><b>23</b>45<c>67</c><b>89</b></a>",
             "<a><b></b>45<c>67</c><b></b></a>",
             |html| html.select("b", |html| html.subselect_contents(|html| html.remove())),
+        ),
+        "ensure element stream" => transform_test!(
+            "<a><b>23</b>45<c>67</c><b>89</b></a>",
+            "<a><b>23</b>45<c>67</c><b>89</b></a>",
+            |html| html.select("b", |html| html
+                .subselect_contents(|html| html)
+                .into_boxed_element()
+            ),
         ),
     );
 }
