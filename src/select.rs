@@ -799,60 +799,51 @@ impl error::Error for Error {
 mod tests {
     use std::str::{ FromStr };
 
-    #[test]
-    fn static_str() {
-        test_transform!(
-            Default::default(),
+    const EMPTY_STR_LIST: &[&str] = &[];
+
+    test_group!(static_str:
+        "tag" => transform_test!(
             "<a><b>23</b></a>",
             "<a><b></b></a>",
-            |html| html.select("b", |html| html.remove_contents())
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("b", |html| html.remove_contents()),
+        ),
+        "id" => transform_test!(
             "<a><b id=\"x\">23</b><b id=\"y\">45</b></a>",
             "<a><b id=\"x\">23</b><b id=\"y\"></b></a>",
-            |html| html.select("#y", |html| html.remove_contents())
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select("#y", |html| html.remove_contents()),
+        ),
+        "class" => transform_test!(
             "<a><b class=\"w x\">23</b><b class=\"y z\">45</b></a>",
             "<a><b class=\"w x\">23</b><b class=\"y z\"></b></a>",
-            |html| html.select(".y", |html| html.remove_contents())
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select(".y", |html| html.remove_contents()),
+        ),
+        "multiple classes" => transform_test!(
             "<a><b class=\"x y\">23</b><b class=\"y z\">45</b></a>",
             "<a><b class=\"x y\">23</b><b class=\"y z\"></b></a>",
-            |html| html.select(".y.z", |html| html.remove_contents())
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select(".y.z", |html| html.remove_contents()),
+        ),
+        "multiple classes reverse" => transform_test!(
             "<a><b class=\"x y\">23</b><b class=\"y z\">45</b></a>",
             "<a><b class=\"x y\">23</b><b class=\"y z\"></b></a>",
-            |html| html.select(".z.y", |html| html.remove_contents())
-        );
-        test_transform!(
-            Default::default(),
+            |html| html.select(".z.y", |html| html.remove_contents()),
+        ),
+        "tag, id, classes" => transform_test!(
             "<a>A</a><a id=\"x\">B</a><a class=\"y z\">C</a><a id=\"x\" class=\"y z\">D</a>",
             "<a>A</a><a id=\"x\">B</a><a class=\"y z\">C</a><a id=\"x\" class=\"y z\"></a>",
-            |html| html.select("a#x.z.y", |html| html.remove_contents())
-        );
-    }
+            |html| html.select("a#x.z.y", |html| html.remove_contents()),
+        ),
+    );
 
-    #[test]
-    fn classes() {
-        test_transform!(
-            Default::default(),
+    test_group!(classes:
+        "from_str_iterator" => transform_test!(
             "<a class=\"X\">23</a><b class=\"Y X\">42</b><a class=\"X Y\">99</a><a>33</a>",
             "<a class=\"X\">23</a><b class=\"Y X\"></b><a class=\"X Y\"></a><a>33</a>",
-            |html| html
-                .select(
-                    super::Classes::from_str_iterator(["x", "Y"].iter().cloned()).unwrap(),
-                    |html| html.remove_contents()
-                )
-        );
-        test_stream_error!(
-            Default::default(),
+            |html| html.select(
+                super::Classes::from_str_iterator(["x", "Y"].iter().cloned()).unwrap(),
+                |html| html.remove_contents()
+            ),
+        ),
+        "from_str_iterator identifier error" => transform_error_test!(
             "",
             ::event::StreamError::Selector {
                 error: super::Error::Classes {
@@ -865,11 +856,9 @@ mod tests {
             |html| html.select(
                 super::Classes::from_str_iterator(["x", "y", "", "z"].iter().cloned()),
                 |html| html,
-            )
-        );
-        let empty: &[&'static str] = &[];
-        test_stream_error!(
-            Default::default(),
+            ),
+        ),
+        "from_str_iterator empty list" => transform_error_test!(
             "",
             ::event::StreamError::Selector {
                 error: super::Error::Classes {
@@ -877,62 +866,59 @@ mod tests {
                 },
             },
             |html| html.select(
-                super::Classes::from_str_iterator(empty.iter().cloned()),
+                super::Classes::from_str_iterator(EMPTY_STR_LIST.iter().cloned()),
                 |html| html,
             )
-        );
-    }
+        ),
+    );
 
-    #[test]
-    fn class() {
-        test_stream_error!(
-            Default::default(),
+    test_group!(class:
+        "from_str" => transform_test!(
+            "<a class=\"X\">23</a><b class=\"Y\">42</b><a class=\"X Y\">99</a><a>33</a>",
+            "<a class=\"X\"></a><b class=\"Y\">42</b><a class=\"X Y\"></a><a>33</a>",
+            |html| html.select(super::Class::from_str("x").unwrap(), |html| html
+                .remove_contents()
+            ),
+        ),
+        "from_str identifier error" => transform_error_test!(
             "",
             ::event::StreamError::Selector {
                 error: super::Error::Class {
                     error: ::text::IdentifierError::Empty,
                 },
             },
-            |html| html.select(super::Class::from_str(""), |html| html)
-        );
-        test_transform!(
-            Default::default(),
-            "<a class=\"X\">23</a><b class=\"Y\">42</b><a class=\"X Y\">99</a><a>33</a>",
-            "<a class=\"X\"></a><b class=\"Y\">42</b><a class=\"X Y\"></a><a>33</a>",
-            |html| html
-                .select(super::Class::from_str("x").unwrap(), |html| html
-                    .remove_contents()
-                )
-        );
-    }
+            |html| html.select(super::Class::from_str(""), |html| html),
+        ),
+    );
 
-    #[test]
-    fn id() {
-        test_stream_error!(
-            Default::default(),
+    test_group!(id:
+        "from_str" => transform_test!(
+            "<a id=\"X\">23</a><b id=\"Y\">42</b><a id=\"X\">99</a><a>33</a>",
+            "<a id=\"X\"></a><b id=\"Y\">42</b><a id=\"X\"></a><a>33</a>",
+            |html| html.select(super::Id::from_str("x").unwrap(), |html| html
+                .remove_contents()
+            ),
+        ),
+        "from_str identifier error" => transform_error_test!(
             "",
             ::event::StreamError::Selector {
                 error: super::Error::Id {
                     error: ::text::IdentifierError::Empty,
                 },
             },
-            |html| html.select(super::Id::from_str(""), |html| html)
-        );
-        test_transform!(
-            Default::default(),
-            "<a id=\"X\">23</a><b id=\"Y\">42</b><a id=\"X\">99</a><a>33</a>",
-            "<a id=\"X\"></a><b id=\"Y\">42</b><a id=\"X\"></a><a>33</a>",
-            |html| html
-                .select(super::Id::from_str("x").unwrap(), |html| html
-                    .remove_contents()
-                )
-        );
-    }
+            |html| html.select(super::Id::from_str(""), |html| html),
+        ),
+    );
 
-    #[test]
-    fn tag() {
-        test_stream_error!(
-            Default::default(),
+    test_group!(tag:
+        "from_str" => transform_test!(
+            "<a>23</a><b>42</b><a>99</a>",
+            "<a></a><b>42</b><a></a>",
+            |html| html.select(super::Tag::from_str("a").unwrap(), |html| html
+                .remove_contents()
+            ),
+        ),
+        "from_str identifier error" => transform_error_test!(
             "",
             ::event::StreamError::Selector {
                 error: super::Error::Tag {
@@ -940,15 +926,6 @@ mod tests {
                 },
             },
             |html| html.select(super::Tag::from_str(""), |html| html)
-        );
-        test_transform!(
-            Default::default(),
-            "<a>23</a><b>42</b><a>99</a>",
-            "<a></a><b>42</b><a></a>",
-            |html| html
-                .select(super::Tag::from_str("a").unwrap(), |html| html
-                    .remove_contents()
-                )
-        );
-    }
+        ),
+    );
 }
