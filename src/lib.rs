@@ -79,6 +79,21 @@ macro_rules! transform_test {
 }
 
 #[cfg(test)]
+macro_rules! transform_error_test {
+    ($input:expr, $expected:pat, $transform:expr $(,)*) => {
+        {
+            let template = ::Template::from_str($input, Default::default()).unwrap();
+            let result = template.transform($transform);
+            if let Err($expected) = result {
+                ()
+            } else {
+                panic!("invalid result: {:?}", result);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 macro_rules! test_transform {
     ($options:expr, $input:expr, $expected:expr, $transform:expr $(,)*) => {{
         let template = ::Template::from_str($input, $options).unwrap();
