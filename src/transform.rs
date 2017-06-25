@@ -450,7 +450,10 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
     ///     Template, ParseOptions, BoxedApi, BoxedElementApi,
     /// };
     ///
-    /// fn fill_item(html: BoxedElementApi, item: Result<i32, i32>) -> BoxedApi {
+    /// fn fill_item(
+    ///     html: BoxedElementApi,
+    ///     item: Result<i32, i32>,
+    /// ) -> BoxedApi {
     ///     html.apply_with_result(
     ///         item,
     ///         |html, item| html
