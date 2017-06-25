@@ -108,6 +108,13 @@ mod tests {
                 .transform(|html| html.select("b", |html| html.replace_contents("foo")))
             )),
         ),
+        "passthrough error" => transform_error_test!(
+            "<a/>",
+            ::event::StreamError::Identifier { error: ::text::IdentifierError::Empty },
+            |html| html.select("a", |html| html.apply_as_template(|template| template
+                .transform(|html| html.select("a", |html| html.set_id("")))
+            )),
+        ),
     );
 
     test_group!(apply:
