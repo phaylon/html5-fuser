@@ -108,9 +108,7 @@ where
     BE: builder::BuildOnce<S>,
 {
     fn next_event(&mut self) -> event::StreamResult {
-        self.state.step(|state| state.step(
-            |stream, iter, builder| Repeat::new(stream, iter, builder),
-        ))
+        self.state.step(|state| state.step(Repeat::new))
     }
 }
 
@@ -299,9 +297,7 @@ where
     BE: builder::BuildOnce<S>,
 {
     fn next_event(&mut self) -> event::StreamResult {
-        self.state.step(|state| state.step(
-            |stream, iter, builder| RepeatContent::new(stream, iter, builder),
-        ))
+        self.state.step(|state| state.step(RepeatContent::new))
     }
 }
 
