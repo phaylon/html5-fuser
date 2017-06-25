@@ -140,27 +140,51 @@ where
 #[cfg(test)]
 mod tests {
 
-    #[test]
-    fn subselect_direct() {
-        test_transform!(
-            Default::default(),
+    test_group!(subselect_direct:
+        "multiple" => transform_test!(
             "<b><a><b>00</b></a><b><b>23</b></b><b>45</b></b>",
             "<b><a><b>00</b></a><b><b>23</b>99</b><b>4599</b></b>",
             |html| html.select("b", |html| html
                 .subselect_direct("b", |html| html.append_contents(99)),
             ),
-        );
-    }
+        ),
+        "two levels direct match" => transform_test!(
+            "<a><a>23</a></a><a>23</a>",
+            "<a><a>99</a></a><a>23</a>",
+            |html| html.select_direct("a", |html| html.subselect_direct("a", |html| html
+                .replace_contents("99")
+            )),
+        ),
+        "late match" => transform_test!(
+            "<c></c><d /><a><a>23</a></a><a>23</a>",
+            "<c></c><d /><a>99</a><a>99</a>",
+            |html| html.select_direct("a", |html| html.select_direct("a", |html| html
+                .replace_contents("99")
+            )),
+        ),
+        "ensure element stream" => transform_test!(
+            "<link>",
+            "<link>",
+            |html| html.select_direct("a", |html| html.select_direct("a", |html| html
+                .into_boxed_element()
+            )),
+        ),
+    );
 
-    #[test]
-    fn subselect_direct_once() {
-        test_transform!(
-            Default::default(),
+    test_group!(subselect_direct_once:
+        "multiple" => transform_test!(
             "<b><a><b>00</b></a><b><b>23</b></b><b>45</b></b>",
             "<b><a><b>00</b></a><b><b>23</b>99</b><b>45</b></b>",
             |html| html.select_once("b", |html| html
                 .subselect_direct_once("b", |html| html.append_contents(99)),
             ),
-        );
-    }
+        ),
+        "ensure element stream" => transform_test!(
+            "<link>",
+            "<link>",
+            |html| html.select_once("b", |html| html
+                .subselect_direct_once("b", |html| html.into_boxed_element()),
+            ),
+        ),
+    );
 }

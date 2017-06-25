@@ -242,32 +242,6 @@ mod tests {
     use std::str::{ FromStr };
 
     #[test]
-    fn subselect_direct() {
-        test_transform!(
-            Default::default(),
-            "<a><a>23</a></a><a>23</a>",
-            "<a><a>99</a></a><a>23</a>",
-            |html| html
-                .select_direct(::select::Tag::from_str("a").unwrap(), |html| html
-                    .subselect_direct(::select::Tag::from_str("a").unwrap(), |html| html
-                        .replace_contents("99")
-                    )
-                )
-        );
-        test_transform!(
-            Default::default(),
-            "<c></c><d /><a><a>23</a></a><a>23</a>",
-            "<c></c><d /><a>99</a><a>99</a>",
-            |html| html
-                .select_direct(::select::Tag::from_str("a").unwrap(), |html| html
-                    .select_direct(::select::Tag::from_str("a").unwrap(), |html| html
-                        .replace_contents("99")
-                    )
-                )
-        );
-    }
-
-    #[test]
     fn select_direct() {
         test_transform!(
             Default::default(),
