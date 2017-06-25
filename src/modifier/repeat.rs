@@ -65,6 +65,11 @@ where
     }
 }
 
+type PeekableRepeatState<S, I, B, BE> = RepeatOrElseState<
+    S, I, B, BE,
+    Repeat<S, iter::Peekable<I>, B>,
+>;
+
 /// Repeat a stream for each item of an iterator or run a fallback transformation.
 pub struct RepeatOrElse<S, I, B, BE>
 where
@@ -72,7 +77,7 @@ where
     B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
     BE: builder::BuildOnce<S>,
 {
-    state: modifier::State<RepeatOrElseState<S, I, B, BE, Repeat<S, iter::Peekable<I>, B>>>,
+    state: modifier::State<PeekableRepeatState<S, I, B, BE>>,
 }
 
 impl<S, I, B, BE> RepeatOrElse<S, I, B, BE>
@@ -248,6 +253,11 @@ where
     }
 }
 
+type PeekableRepeatContentState<S, I, B, BE> = RepeatOrElseState<
+    S, I, B, BE,
+    RepeatContent<S, iter::Peekable<I>, B>,
+>;
+
 /// Repeat the contents of the current element for each item of an iterator or run a
 /// fallback transform.
 pub struct RepeatContentOrElse<S, I, B, BE>
@@ -257,9 +267,7 @@ where
     B: builder::BuildMutMapped<template::TemplateStream, I::Item>,
     BE: builder::BuildOnce<S>,
 {
-    state: modifier::State<
-        RepeatOrElseState<S, I, B, BE, RepeatContent<S, iter::Peekable<I>, B>>,
-    >,
+    state: modifier::State<PeekableRepeatContentState<S, I, B, BE>>,
 }
 
 impl<S, I, B, BE> RepeatContentOrElse<S, I, B, BE>
