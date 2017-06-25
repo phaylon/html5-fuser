@@ -255,19 +255,6 @@ mod tests {
     }
 
     #[test]
-    fn select_contents() {
-        test_transform!(
-            Default::default(),
-            "<a><b>23</b>45<c>67</c><b>89</b></a>",
-            "<a><b></b>45<c>67</c><b></b></a>",
-            |html| html
-                .select(::select::Tag::from_str("b").unwrap(), |html| html
-                    .subselect_contents(|html| html.remove())
-                )
-        );
-    }
-
-    #[test]
     fn select_roundtrip() {
         let original = "<a><b><c><b>foo</b></c></b></a>";
         test_transform!(
