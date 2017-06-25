@@ -352,57 +352,37 @@ impl event::IntoStream for Template {
 
 #[cfg(test)]
 mod tests {
-    use std::str::{ FromStr };
-    use std::rc;
 
-    #[test]
-    fn into_stream_ref() {
-        let new = ::Template::from_str("<b></b>", Default::default()).unwrap();
-        test_transform!(
-            Default::default(),
+    test_group!(into_stream:
+        "template reference" => {
+            let new = ::Template::from_str("<b></b>", Default::default()).unwrap();
+            transform_test!(
+                "<a></a>",
+                "<a><b></b></a>",
+                |html| html.select("a", |html| html.replace_contents(&new)),
+            );
+        },
+        "template rc" => {
+            use std::rc;
+            let new = rc::Rc::new(::Template::from_str("<b></b>", Default::default()).unwrap());
+            transform_test!(
+                "<a></a>",
+                "<a><b></b></a>",
+                |html| html.select("a", |html| html.replace_contents(new.clone())),
+            );
+        },
+        "template plain" => transform_test!(
             "<a></a>",
             "<a><b></b></a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .replace_contents(&new)
-                )
-        );
-    }
+            |html| html.select("a", |html| html.replace_contents(
+                ::Template::from_str("<b></b>", Default::default()).unwrap(),
+            )),
+        ),
+    );
 
-    #[test]
-    fn into_stream_rc() {
-        let new = rc::Rc::new(::Template::from_str("<b></b>", Default::default()).unwrap());
-        test_transform!(
-            Default::default(),
-            "<a></a>",
-            "<a><b></b></a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .replace_contents(new.clone())
-                )
-        );
-    }
-
-    #[test]
-    fn into_stream() {
-        test_transform!(
-            Default::default(),
-            "<a></a>",
-            "<a><b></b></a>",
-            |html| html
-                .select(::select::Tag::from_str("a").unwrap(), |html| html
-                    .replace_contents(
-                        ::Template::from_str("<b></b>", Default::default()).unwrap(),
-                    )
-                )
-        );
-    }
-
-    #[test]
-    fn roundtrip() {
-        let original = "<a><b>foo</b></a>";
-        test_transform!(Default::default(), original, original, |html| html);
-        test_transform!(Default::default(), "", "", |html| html);
-        test_transform!(Default::default(), "foo", "foo", |html| html);
-    }
+    test_group!(round_trip:
+        "nested" => transform_test!("<a><b>foo</b></a>", "<a><b>foo</b></a>", |html| html),
+        "empty" => transform_test!("", "", |html| html),
+        "data only" => transform_test!("foo", "foo", |html| html),
+    );
 }
