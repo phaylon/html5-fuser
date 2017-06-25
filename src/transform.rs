@@ -439,6 +439,70 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
         }
     }
 
+    /// Apply one of two transformations depending on a result value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{
+    ///     Template, ParseOptions, BoxedApi, BoxedElementApi,
+    /// };
+    ///
+    /// fn fill_item(html: BoxedElementApi, item: Result<i32, i32>) -> BoxedApi {
+    ///     html.apply_with_result(
+    ///         item,
+    ///         |html, item| html
+    ///             .replace_contents(item)
+    ///             .prepend_contents("OK "),
+    ///         |html, error| html
+    ///             .replace_contents(error)
+    ///             .prepend_contents("ERR "),
+    ///     ).into_boxed()
+    /// }
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <div id="one"></div>
+    ///     <div id="two"></div>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("#one", |html|
+    ///         fill_item(html.into_boxed_element(), Ok(23))
+    ///     )
+    ///     .select("#two", |html|
+    ///         fill_item(html.into_boxed_element(), Err(42))
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(r#"<div id="one">OK 23</div>"#));
+    /// assert!(output.contains(r#"<div id="two">ERR 42</div>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn apply_with_result<T, E, B1, B2, R1, R2>(
+        self,
+        value: Result<T, E>,
+        ok_builder: B1,
+        err_builder: B2,
+    ) -> Api<'t, modifier::apply::ApplyEither<R1, R2>>
+    where
+        B1: for<'tb> FnOnce(Api<'tb, S>, T) -> Api<'tb, R1>,
+        R1: event::Stream,
+        B2: for<'tb> FnOnce(Api<'tb, S>, E) -> Api<'tb, R2>,
+        R2: event::Stream,
+    {
+        match value {
+            Ok(value) => Api::pack(modifier::apply::ApplyEither::first(
+                ok_builder(self, value).unpack()
+            )),
+            Err(error) => Api::pack(modifier::apply::ApplyEither::second(
+                err_builder(self, error).unpack()
+            )),
+        }
+    }
+
     /// Apply transformation to a boxed version of the stream.
     ///
     /// # Examples
