@@ -321,8 +321,8 @@ impl Template {
     where
         T: text::IntoIdentifier,
         B: for<'tb> FnOnce(
-                transform::Api<'tb,modifier::select::BuildElementStream<TemplateStream>>
-            ) -> transform::Api<'tb, R>,
+            transform::Api<'tb, modifier::select::BuildElementStream<TemplateStream>>
+        ) -> transform::Api<'tb, R>,
         R: event::Stream,
     {
         let tag = tag.into_identifier()?;
