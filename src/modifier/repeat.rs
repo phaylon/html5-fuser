@@ -1,6 +1,8 @@
 
 //! Repeat a stream multiple times.
 
+use std::iter;
+
 use event;
 use modifier;
 use transform;
@@ -9,6 +11,103 @@ use builder;
 
 /// A stored stream representing an element if the parent stream does.
 pub type MaybeElementTemplate<D> = modifier::Derived<template::TemplateStream, D>;
+
+enum RepeatOrElseState<S, I, B, BE, SR>
+where
+    I: Iterator,
+//    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    Start {
+        stream: S,
+        iter: I,
+        builder: B,
+        else_builder: BE,
+    },
+    Fallback {
+        stream: BE::Stream,
+    },
+    Repeat {
+        stream: SR,
+    },
+}
+
+impl<S, I, B, BE, SR> RepeatOrElseState<S, I, B, BE, SR>
+where
+    S: event::Stream,
+    SR: event::Stream,
+    I: Iterator,
+//    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    fn step<F>(self, stepper: F) -> modifier::StateResult<RepeatOrElseState<S, I, B, BE, SR>>
+    where
+        F: FnOnce(S, iter::Peekable<I>, B) -> SR,
+    {
+        match self {
+            RepeatOrElseState::Start { stream, iter, builder, else_builder } => {
+                let mut iter = iter.peekable();
+                if iter.peek().is_some() {
+                    Ok(Some((event::noop(), Some(RepeatOrElseState::Repeat {
+                        stream: stepper(stream, iter, builder),
+                    }))))
+                } else {
+                    Ok(Some((event::noop(), Some(RepeatOrElseState::Fallback {
+                        stream: transform::build_once(stream, else_builder),
+                    }))))
+                }
+            },
+            RepeatOrElseState::Fallback { stream } =>
+                modifier::passthrough(stream, |stream| RepeatOrElseState::Fallback { stream }),
+            RepeatOrElseState::Repeat { stream } =>
+                modifier::passthrough(stream, |stream| RepeatOrElseState::Repeat { stream }),
+        }
+    }
+}
+
+/// Repeat a stream for each item of an iterator or run a fallback transformation.
+pub struct RepeatOrElse<S, I, B, BE>
+where
+    I: Iterator,
+    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    state: modifier::State<RepeatOrElseState<S, I, B, BE, Repeat<S, iter::Peekable<I>, B>>>,
+}
+
+impl<S, I, B, BE> RepeatOrElse<S, I, B, BE>
+where
+    I: Iterator,
+    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    pub(crate) fn new(
+        stream: S,
+        iter: I,
+        builder: B,
+        else_builder: BE,
+    ) -> RepeatOrElse<S, I, B, BE> {
+        RepeatOrElse {
+            state: modifier::State::new(
+                RepeatOrElseState::Start { stream, iter, builder, else_builder },
+            ),
+        }
+    }
+}
+
+impl<S, I, B, BE> event::Stream for RepeatOrElse<S, I, B, BE>
+where
+    S: event::Stream,
+    I: Iterator,
+    B: builder::BuildMutMapped<MaybeElementTemplate<S>, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    fn next_event(&mut self) -> event::StreamResult {
+        self.state.step(|state| state.step(
+            |stream, iter, builder| Repeat::new(stream, iter, builder),
+        ))
+    }
+}
 
 /// Repeat a stream for each item of an iterator.
 pub struct Repeat<S, I, B>
@@ -146,6 +245,55 @@ where
                 builder: self.builder,
             }),
         })
+    }
+}
+
+/// Repeat the contents of the current element for each item of an iterator or run a
+/// fallback transform.
+pub struct RepeatContentOrElse<S, I, B, BE>
+where
+    S: event::ElementStream,
+    I: Iterator,
+    B: builder::BuildMutMapped<template::TemplateStream, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    state: modifier::State<
+        RepeatOrElseState<S, I, B, BE, RepeatContent<S, iter::Peekable<I>, B>>,
+    >,
+}
+
+impl<S, I, B, BE> RepeatContentOrElse<S, I, B, BE>
+where
+    S: event::ElementStream,
+    I: Iterator,
+    B: builder::BuildMutMapped<template::TemplateStream, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    pub(crate) fn new(
+        stream: S,
+        iter: I,
+        builder: B,
+        else_builder: BE,
+    ) -> RepeatContentOrElse<S, I, B, BE> {
+        RepeatContentOrElse {
+            state: modifier::State::new(
+                RepeatOrElseState::Start { stream, iter, builder, else_builder },
+            ),
+        }
+    }
+}
+
+impl<S, I, B, BE> event::Stream for RepeatContentOrElse<S, I, B, BE>
+where
+    S: event::ElementStream,
+    I: Iterator,
+    B: builder::BuildMutMapped<template::TemplateStream, I::Item>,
+    BE: builder::BuildOnce<S>,
+{
+    fn next_event(&mut self) -> event::StreamResult {
+        self.state.step(|state| state.step(
+            |stream, iter, builder| RepeatContent::new(stream, iter, builder),
+        ))
     }
 }
 

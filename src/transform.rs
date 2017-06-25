@@ -994,6 +994,65 @@ impl<'t, S> Api<'t, S> where S: event::Stream {
     {
         Api::pack(modifier::repeat::Repeat::new(self.stream, iter.into_iter(), builder))
     }
+
+    /// Repeats a stream for each item of an iterator or run a fallback transformation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{
+    ///     Template, ParseOptions, BoxedElementApi, BoxedApi,
+    /// };
+    ///
+    /// fn fill_items(html: BoxedElementApi, items: Vec<i32>) -> BoxedApi {
+    ///     html.repeat_or_else(items,
+    ///         |html, value| html.replace_contents(value),
+    ///         |html| html.replace_contents("None").add_class("none"),
+    ///     ).into_boxed()
+    /// }
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <ul id="one"><li>Item</li></ul>
+    ///     <ul id="two"><li>Item</li></ul>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("#one", |html| html.select("li", |html|
+    ///         fill_items(html.into_boxed_element(), vec![2, 3])
+    ///     ))
+    ///     .select("#two", |html| html.select("li", |html|
+    ///         fill_items(html.into_boxed_element(), vec![])
+    ///     ))
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<ul id="one"><li>2</li><li>3</li></ul>"#,
+    /// ));
+    /// assert!(output.contains(
+    ///     r#"<ul id="two"><li class="none">None</li></ul>"#,
+    /// ));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn repeat_or_else<I, B, R, BE, BER>(self, iter: I, builder: B, else_builder: BE)
+    -> Api<'t, modifier::repeat::RepeatOrElse<S, I::IntoIter, B, BE>>
+    where
+        I: IntoIterator,
+        B: for<'tb> FnMut(Api<'tb, modifier::repeat::MaybeElementTemplate<S>>, I::Item)
+            -> Api<'tb, R>,
+        BE: for<'tb> FnOnce(Api<'tb, S>) -> Api<'tb, BER>,
+        BER: event::Stream,
+        R: event::Stream,
+    {
+        Api::pack(modifier::repeat::RepeatOrElse::new(
+            self.stream,
+            iter.into_iter(),
+            builder,
+            else_builder,
+        ))
+    }
 }
 
 type SubSelectAny<S, M, B> =
@@ -1476,6 +1535,73 @@ impl<'t, S> Api<'t, S> where S: event::ElementStream {
         R: event::Stream,
     {
         Api::pack(modifier::repeat::RepeatContent::new(self.stream, iter.into_iter(), builder))
+    }
+
+    /// Repeat contents for each iterator item or run a fallback transform.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::error;
+    /// # fn run() -> Result<(), Box<error::Error>> {
+    /// use html5_fuser::{ Template, ParseOptions, BoxedApi };
+    ///
+    /// fn fill_items(html: BoxedApi, items: Vec<i32>) -> BoxedApi {
+    ///     html.select_once("ul", |html| html
+    ///         .repeat_contents_or_else(items,
+    ///             |html, value| html.select_once("li", move |html| html
+    ///                 .replace_contents(value)
+    ///             ),
+    ///             |html| html.replace(
+    ///                 Template::with_element("div").map(|template|
+    ///                     template.transform(|html| html
+    ///                         .select_once("div", |html| html
+    ///                             .replace_contents("None")
+    ///                         )
+    ///                     )
+    ///                 ),
+    ///             ),
+    ///         )
+    ///     ).into_boxed()
+    /// }
+    ///
+    /// let template = Template::from_str(r#"
+    ///     <ul id="one"><li>Item</li></ul>
+    ///     <ul id="two"><li>Item</li></ul>
+    /// "#, ParseOptions::default())?;
+    ///
+    /// let output = format!("{}", template.transform(|html| html
+    ///     .select("#one", |html|
+    ///         fill_items(html.into_boxed(), vec![2, 3])
+    ///     )
+    ///     .select("#two", |html|
+    ///         fill_items(html.into_boxed(), vec![])
+    ///     )
+    /// )?);
+    ///
+    /// assert!(output.contains(
+    ///     r#"<ul id="one"><li>2</li><li>3</li></ul>"#,
+    /// ));
+    /// assert!(!output.contains(r#"<ul id="two">"#));
+    /// assert!(output.contains(r#"<div>None</div>"#));
+    /// # Ok(()) }
+    /// # fn main() { run().unwrap() }
+    /// ```
+    pub fn repeat_contents_or_else<I, B, R, BE, BER>(self, iter: I, builder: B, else_builder: BE)
+    -> Api<'t, modifier::repeat::RepeatContentOrElse<S, I::IntoIter, B, BE>>
+    where
+        I: IntoIterator,
+        B: for<'tb> FnMut(Api<'tb, template::TemplateStream>, I::Item) -> Api<'tb, R>,
+        BE: for<'tb> FnOnce(Api<'tb, S>) -> Api<'tb, BER>,
+        R: event::Stream,
+        BER: event::Stream,
+    {
+        Api::pack(modifier::repeat::RepeatContentOrElse::new(
+            self.stream,
+            iter.into_iter(),
+            builder,
+            else_builder
+        ))
     }
 
     /// Add an attribute to the current element.
